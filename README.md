@@ -42,14 +42,6 @@ This library now supports **quantum-resistant hierarchical deterministic key der
   - Public key: 2,592 bytes
   - Signature: 4,627 bytes
 
-### Key Features
-
-✅ **Full BIP-32 Compatibility**: Uses standard hierarchical derivation paths (e.g., `m/360'/0'/0'/0/0`)
-✅ **Deterministic**: Same seed always generates the same quantum keys
-✅ **Future-Proof**: Meets post-2030 and post-2035 security requirements
-✅ **Production-Ready**: 99.4% test coverage, comprehensive validation
-✅ **No External Dependencies**: Uses `@btc-vision/post-quantum` for ML-DSA-87
-
 ### Important Note: Key Derivation Differences
 
 Unlike traditional ECDSA BIP-32:
