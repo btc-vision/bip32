@@ -1,5 +1,5 @@
 {
-  "name": "bip32",
+  "name": "@btc-vision/bip32",
   "version": "5.0.0",
   "type": "module",
   "description": "A BIP32 compatible library",
