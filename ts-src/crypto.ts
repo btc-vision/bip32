@@ -8,6 +8,10 @@ export function hash160(buffer: Uint8ArrayOrBuffer): Uint8ArrayOrBuffer {
   return ripemd160(sha256(buffer));
 }
 
+export function hash256(buffer: Uint8ArrayOrBuffer): Uint8ArrayOrBuffer {
+  return sha256(buffer);
+}
+
 export function hmacSHA512(
   key: Uint8ArrayOrBuffer,
   data: Uint8ArrayOrBuffer,
