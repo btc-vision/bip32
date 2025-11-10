@@ -49,7 +49,7 @@ export function BIP32Factory(ecc) {
                 throw new Error('Missing private key');
             if (lowR === undefined)
                 lowR = this.lowR;
-            if (lowR === false) {
+            if (!lowR) {
                 return ecc.sign(hash, this.privateKey);
             }
             else {

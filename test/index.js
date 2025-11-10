@@ -1,7 +1,7 @@
 import BIP32Creator from '../src/esm/index.js'
 import tape from 'tape'
-import fixtures from './fixtures/index.json' assert { type: "json" }
-const { valid, invalid } = fixtures 
+import fixtures from './fixtures/index.json' with { type: "json" }
+const { valid, invalid } = fixtures
 import * as ecc from "tiny-secp256k1";
 import * as tools from "uint8array-tools";
 const BIP32 = BIP32Creator(ecc)
@@ -316,7 +316,7 @@ tape('tweak - neutered', (t) => {
   t.plan(8)
   t.throws(() => signer.sign(hash), /Missing private key/)
   t.throws(() => signer.signSchnorr(hash), /Missing private key/)
-  
+
   t.equal(signer.verify(hash, signature), true)
   t.equal(signer.verify(seed, signature), false)
   t.equal(signer.verify(hash, signatureLowR), true)

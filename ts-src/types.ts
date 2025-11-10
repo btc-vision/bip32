@@ -21,15 +21,9 @@ const Uint8Schema = v.pipe(
   v.maxValue(0xff),
 );
 
-export const Buffer256Bit = v.pipe(
-  v.instance(Uint8Array),
-  v.length(32),
-);
+export const Buffer256Bit = v.pipe(v.instance(Uint8Array), v.length(32));
 
-export const Buffer33Bytes = v.pipe(
-  v.instance(Uint8Array),
-  v.length(33),
-);
+export const Buffer33Bytes = v.pipe(v.instance(Uint8Array), v.length(33));
 
 export const NetworkSchema = v.object({
   wif: Uint8Schema,
