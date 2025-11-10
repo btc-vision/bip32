@@ -5,6 +5,9 @@ import { sha512 } from '@noble/hashes/sha512';
 export function hash160(buffer) {
     return ripemd160(sha256(buffer));
 }
+export function hash256(buffer) {
+    return sha256(buffer);
+}
 export function hmacSHA512(key, data) {
     return hmac(sha512, key, data);
 }
