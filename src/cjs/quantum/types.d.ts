@@ -1,36 +1,47 @@
 import { Uint8ArrayOrBuffer } from '../Buffer.js';
+import { MLDSASecurityLevel } from './config.js';
 /**
- * ML-DSA-87 key pair interface
- * ML-DSA-87 provides Level 5 security (256-bit classical security)
+ * ML-DSA key pair interface
+ *
+ * This represents a basic ML-DSA key pair without BIP32 functionality.
+ * Key sizes vary by security level:
+ * - LEVEL2 (44): 2560-byte private, 1312-byte public
+ * - LEVEL3 (65): 4032-byte private, 1952-byte public
+ * - LEVEL5 (87): 4896-byte private, 2592-byte public
  */
-export interface MLDSA87KeyPair {
-    /** 4896-byte private key containing polynomial vectors and matrices */
+export interface MLDSAKeyPair {
+    /** Private key containing polynomial vectors and matrices */
     privateKey: Uint8ArrayOrBuffer;
-    /** 2592-byte public key */
+    /** Public key */
     publicKey: Uint8ArrayOrBuffer;
 }
 /**
- * Quantum-resistant signer interface using ML-DSA-87
+ * Quantum-resistant signer interface using ML-DSA
+ *
+ * Provides sign/verify functionality for any ML-DSA security level.
+ * This is essentially the same as MLDSAKeyPair but with methods instead of just data.
  */
 export interface QuantumSigner {
+    /** ML-DSA public key (size depends on security level) */
     publicKey: Uint8ArrayOrBuffer;
+    /** ML-DSA private key (size depends on security level), undefined for neutered keys */
     privateKey?: Uint8ArrayOrBuffer;
     /**
-     * Sign a message hash using ML-DSA-87
+     * Sign a message hash using ML-DSA
      * @param hash - The hash to sign
-     * @returns ML-DSA-87 signature
+     * @returns ML-DSA signature (size depends on security level)
      */
     sign(hash: Uint8ArrayOrBuffer): Uint8ArrayOrBuffer;
     /**
-     * Verify a signature using ML-DSA-87
+     * Verify a signature using ML-DSA
      * @param hash - The hash that was signed
-     * @param signature - The ML-DSA-87 signature to verify
+     * @param signature - The ML-DSA signature to verify
      * @returns true if signature is valid
      */
     verify(hash: Uint8ArrayOrBuffer, signature: Uint8ArrayOrBuffer): boolean;
 }
 /**
- * Quantum BIP32 interface extending standard BIP32 with ML-DSA-87 support
+ * Quantum BIP32 interface extending standard BIP32 with ML-DSA support
  */
 export interface QuantumBIP32Interface extends QuantumSigner {
     chainCode: Uint8ArrayOrBuffer;
@@ -39,6 +50,7 @@ export interface QuantumBIP32Interface extends QuantumSigner {
     parentFingerprint: number;
     identifier: Uint8ArrayOrBuffer;
     fingerprint: Uint8ArrayOrBuffer;
+    securityLevel: MLDSASecurityLevel;
     /**
      * Check if this is a neutered (public-only) key
      */
@@ -73,25 +85,29 @@ export interface QuantumBIP32Interface extends QuantumSigner {
 export interface QuantumBIP32API {
     /**
      * Create a quantum master key from a seed
-     * Uses ML-DSA-87 for key generation
+     * Uses ML-DSA for key generation (default: ML-DSA-44)
      * @param seed - Seed bytes (16-64 bytes)
+     * @param securityLevel - ML-DSA security level (44, 65, or 87)
      */
-    fromSeed(seed: Uint8ArrayOrBuffer): QuantumBIP32Interface;
+    fromSeed(seed: Uint8ArrayOrBuffer, securityLevel?: MLDSASecurityLevel): QuantumBIP32Interface;
     /**
      * Import a quantum key from base58
+     * Security level is detected from the version bytes
      * @param inString - Base58-encoded extended key
      */
     fromBase58(inString: string): QuantumBIP32Interface;
     /**
      * Create quantum key from public key and chain code
-     * @param publicKey - ML-DSA-87 public key (2592 bytes)
+     * @param publicKey - ML-DSA public key (size depends on security level)
      * @param chainCode - Chain code (32 bytes)
+     * @param securityLevel - ML-DSA security level (44, 65, or 87)
      */
-    fromPublicKey(publicKey: Uint8ArrayOrBuffer, chainCode: Uint8ArrayOrBuffer): QuantumBIP32Interface;
+    fromPublicKey(publicKey: Uint8ArrayOrBuffer, chainCode: Uint8ArrayOrBuffer, securityLevel?: MLDSASecurityLevel): QuantumBIP32Interface;
     /**
      * Create quantum key from private key and chain code
-     * @param privateKey - ML-DSA-87 private key (4896 bytes)
+     * @param privateKey - ML-DSA private key (size depends on security level)
      * @param chainCode - Chain code (32 bytes)
+     * @param securityLevel - ML-DSA security level (44, 65, or 87)
      */
-    fromPrivateKey(privateKey: Uint8ArrayOrBuffer, chainCode: Uint8ArrayOrBuffer): QuantumBIP32Interface;
+    fromPrivateKey(privateKey: Uint8ArrayOrBuffer, chainCode: Uint8ArrayOrBuffer, securityLevel?: MLDSASecurityLevel): QuantumBIP32Interface;
 }

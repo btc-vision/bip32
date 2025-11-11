@@ -6,11 +6,24 @@ export {
   TinySecp256k1Interface,
 } from './bip32.js';
 
-// Quantum-resistant BIP32 using ML-DSA-87
+// Quantum-resistant BIP32 using ML-DSA
 export {
   QuantumBIP32Factory,
   QuantumBIP32Interface,
   QuantumBIP32API,
   QuantumSigner,
-  MLDSA87KeyPair,
+  MLDSAKeyPair,
+  MLDSASecurityLevel,
+  MLDSAConfig,
+  MLDSA_CONFIGS,
+  DEFAULT_SECURITY_LEVEL,
+  getMLDSAConfig
 } from './quantum/index.js';
+
+// Derivation path enums
+export {
+  DerivationPath,
+  QuantumDerivationPath,
+  getQuantumPath,
+  getBitcoinPath,
+} from './derivation-paths.js';

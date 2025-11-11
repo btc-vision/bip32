@@ -42,6 +42,7 @@ const v = __importStar(require("valibot"));
 const types_js_1 = require("../types.cjs");
 const base_1 = require("@scure/base");
 const sha256_1 = require("@noble/hashes/sha256");
+const config_js_1 = require("./config.cjs");
 const _bs58check = (0, base_1.base58check)(sha256_1.sha256);
 const bs58check = {
     encode: (data) => _bs58check.encode(data),
@@ -121,6 +122,9 @@ class QuantumBIP32 extends QuantumBip32Signer {
     }
     get fingerprint() {
         return this.identifier.slice(0, 4);
+    }
+    get securityLevel() {
+        return config_js_1.MLDSASecurityLevel.LEVEL5; // ML-DSA-87 only
     }
     isNeutered() {
         return this._privateKey === undefined;

@@ -1,4 +1,3 @@
-import { ml_dsa87 } from '@btc-vision/post-quantum/ml-dsa.js';
 import { randomBytes } from '@btc-vision/post-quantum/utils.js';
 import * as crypto from '../crypto.js';
 import * as tools from 'uint8array-tools';
@@ -6,31 +5,25 @@ import * as v from 'valibot';
 import { Uint32Schema, Uint31Schema, Bip32PathSchema } from '../types.js';
 import { base58check } from '@scure/base';
 import { sha256 } from '@noble/hashes/sha256';
-import { MLDSASecurityLevel } from './config.js';
+import { getMLDSAConfig, DEFAULT_SECURITY_LEVEL, } from './config.js';
 const _bs58check = base58check(sha256);
 const bs58check = {
     encode: (data) => _bs58check.encode(data),
     decode: (str) => _bs58check.decode(str),
 };
-// Constants for ML-DSA-87
-const MLDSA87_PRIVATE_KEY_SIZE = 4896;
-const MLDSA87_PUBLIC_KEY_SIZE = 2592;
 const CHAIN_CODE_SIZE = 32;
 const HIGHEST_BIT = 0x80000000;
-// Quantum BIP32 version bytes (using 360' as per specification)
-const QUANTUM_BIP32_VERSION = {
-    public: 0x04889b21, // Custom version for quantum public keys
-    private: 0x04889ade, // Custom version for quantum private keys
-};
 /**
- * Quantum signer implementation using ML-DSA-87
+ * Quantum signer implementation using ML-DSA
  */
 class QuantumBip32Signer {
     _privateKey;
     _publicKey;
-    constructor(_privateKey, _publicKey) {
+    config;
+    constructor(_privateKey, _publicKey, config) {
         this._privateKey = _privateKey;
         this._publicKey = _publicKey;
+        this.config = config;
     }
     get publicKey() {
         if (!this._publicKey) {
@@ -45,28 +38,27 @@ class QuantumBip32Signer {
         if (!this._privateKey) {
             throw new Error('Missing private key');
         }
-        // ML-DSA-87 signature with extra entropy for enhanced security
-        // The @btc-vision/post-quantum library requires extraEntropy for security
-        const signature = ml_dsa87.sign(hash, this._privateKey, {
+        // ML-DSA signature with extra entropy for enhanced security
+        const signature = this.config.algorithm.sign(hash, this._privateKey, {
             extraEntropy: randomBytes(32),
         });
         return signature;
     }
     verify(hash, signature) {
-        return ml_dsa87.verify(signature, hash, this._publicKey);
+        return this.config.algorithm.verify(signature, hash, this._publicKey);
     }
 }
 /**
- * Quantum BIP32 implementation using ML-DSA-87
- * Uses BIP32 for hierarchical seed derivation, then ML-DSA-87 for key generation
+ * Quantum BIP32 implementation using ML-DSA
+ * Uses BIP32 for hierarchical seed derivation, then ML-DSA for key generation
  */
 class QuantumBIP32 extends QuantumBip32Signer {
     chainCode;
     _depth;
     _index;
     _parentFingerprint;
-    constructor(_privateKey, _publicKey, chainCode, _depth = 0, _index = 0, _parentFingerprint = 0x00000000) {
-        super(_privateKey, _publicKey);
+    constructor(_privateKey, _publicKey, chainCode, config, _depth = 0, _index = 0, _parentFingerprint = 0x00000000) {
+        super(_privateKey, _publicKey, config);
         this.chainCode = chainCode;
         this._depth = _depth;
         this._index = _index;
@@ -88,29 +80,29 @@ class QuantumBIP32 extends QuantumBip32Signer {
         return this.identifier.slice(0, 4);
     }
     get securityLevel() {
-        return MLDSASecurityLevel.LEVEL5; // ML-DSA-87 only
+        return this.config.level;
     }
     isNeutered() {
         return this._privateKey === undefined;
     }
     neutered() {
-        return new QuantumBIP32(undefined, this.publicKey, this.chainCode, this.depth, this.index, this.parentFingerprint);
+        return new QuantumBIP32(undefined, this.publicKey, this.chainCode, this.config, this.depth, this.index, this.parentFingerprint);
     }
     toBase58() {
         const version = !this.isNeutered()
-            ? QUANTUM_BIP32_VERSION.private
-            : QUANTUM_BIP32_VERSION.public;
+            ? this.config.version.private
+            : this.config.version.public;
         const isPrivate = !this.isNeutered();
         const keySize = isPrivate
-            ? MLDSA87_PRIVATE_KEY_SIZE
-            : MLDSA87_PUBLIC_KEY_SIZE;
+            ? this.config.privateKeySize
+            : this.config.publicKeySize;
         // Buffer structure:
         // 4 bytes: version
         // 1 byte: depth
         // 4 bytes: parent fingerprint
         // 4 bytes: child index
         // 32 bytes: chain code
-        // 4896 or 2592 bytes: key data
+        // variable bytes: key data (depends on security level)
         const bufferSize = 4 + 1 + 4 + 4 + 32 + keySize;
         const buffer = new Uint8Array(bufferSize);
         let offset = 0;
@@ -140,11 +132,11 @@ class QuantumBIP32 extends QuantumBip32Signer {
     }
     /**
      * Derive a child key using BIP32 HMAC chain for seed derivation,
-     * then ML-DSA-87 for key generation
+     * then ML-DSA for key generation
      */
     derive(index) {
         v.parse(Uint32Schema, index);
-        // ML-DSA-87 cannot derive child keys without the private key
+        // ML-DSA cannot derive child keys without the private key
         // Unlike EC crypto, you cannot do public key only derivation
         if (this.isNeutered()) {
             throw new TypeError('Cannot derive child keys without private key');
@@ -153,8 +145,8 @@ class QuantumBIP32 extends QuantumBip32Signer {
         let data;
         // Hardened child
         if (isHardened) {
-            // For ML-DSA-87, we use a hash of the private key for derivation data
-            // since the private key is too large (4896 bytes)
+            // For ML-DSA, we use a hash of the private key for derivation data
+            // since the private key can be large
             const privateKeyHash = crypto.hash256(this._privateKey);
             data = new Uint8Array(1 + 32 + 4);
             data[0] = 0x00;
@@ -162,7 +154,7 @@ class QuantumBIP32 extends QuantumBip32Signer {
             tools.writeUInt32(data, 33, index, 'BE');
         }
         else {
-            // Normal child - still needs private key for ML-DSA-87
+            // Normal child - still needs private key for ML-DSA
             // Use hash of private key (not public key like EC)
             const privateKeyHash = crypto.hash256(this._privateKey);
             data = new Uint8Array(32 + 4);
@@ -173,11 +165,10 @@ class QuantumBIP32 extends QuantumBip32Signer {
         const I = crypto.hmacSHA512(this.chainCode, data);
         const IL = I.slice(0, 32); // 256 bits for key generation seed
         const IR = I.slice(32); // 256 bits for new chain code
-        // Use IL as entropy for ML-DSA-87 key generation
-        // IL is already 32 bytes (256 bits), which is the required seed size
-        // Generate ML-DSA-87 key pair from seed
-        const { secretKey: privateKey, publicKey } = ml_dsa87.keygen(IL);
-        return new QuantumBIP32(privateKey, publicKey, IR, this.depth + 1, index, tools.readUInt32(this.fingerprint, 0, 'BE'));
+        // Use IL as entropy for ML-DSA key generation
+        // Generate ML-DSA key pair from seed
+        const { secretKey: privateKey, publicKey } = this.config.algorithm.keygen(IL);
+        return new QuantumBIP32(privateKey, publicKey, IR, this.config, this.depth + 1, index, tools.readUInt32(this.fingerprint, 0, 'BE'));
     }
     deriveHardened(index) {
         try {
@@ -213,7 +204,7 @@ class QuantumBIP32 extends QuantumBip32Signer {
 /**
  * Create a quantum BIP32 master key from a seed
  */
-function fromSeed(seed) {
+function fromSeed(seed, securityLevel = DEFAULT_SECURITY_LEVEL) {
     v.parse(v.instance(Uint8Array), seed);
     if (seed.length < 16) {
         throw new TypeError('Seed should be at least 128 bits');
@@ -221,15 +212,15 @@ function fromSeed(seed) {
     if (seed.length > 64) {
         throw new TypeError('Seed should be at most 512 bits');
     }
+    const config = getMLDSAConfig(securityLevel);
     // Use BIP32 standard HMAC for initial seed derivation
     const I = crypto.hmacSHA512(tools.fromUtf8('Bitcoin seed'), seed);
     const IL = I.slice(0, 32);
     const IR = I.slice(32);
-    // IL is 32 bytes (256 bits), which is the required seed size for ML-DSA-87
-    // Generate ML-DSA-87 master key pair
-    const { secretKey: privateKey, publicKey } = ml_dsa87.keygen(IL);
+    // Generate ML-DSA master key pair
+    const { secretKey: privateKey, publicKey } = config.algorithm.keygen(IL);
     return new QuantumBIP32(privateKey, publicKey, IR, // Chain code
-    0, // depth
+    config, 0, // depth
     0, // index
     0);
 }
@@ -238,16 +229,24 @@ function fromSeed(seed) {
  */
 function fromBase58(inString) {
     const buffer = bs58check.decode(inString);
-    // Read version
+    // Read version to determine security level
     const version = tools.readUInt32(buffer, 0, 'BE');
-    const isPrivate = version === QUANTUM_BIP32_VERSION.private;
-    const isPublic = version === QUANTUM_BIP32_VERSION.public;
-    if (!isPrivate && !isPublic) {
+    // Find matching config by version
+    let config;
+    for (const level of [44, 65, 87]) {
+        const c = getMLDSAConfig(level);
+        if (version === c.version.private || version === c.version.public) {
+            config = c;
+            break;
+        }
+    }
+    if (!config) {
         throw new TypeError('Invalid quantum BIP32 version');
     }
+    const isPrivate = version === config.version.private;
     const expectedSize = isPrivate
-        ? 4 + 1 + 4 + 4 + 32 + MLDSA87_PRIVATE_KEY_SIZE
-        : 4 + 1 + 4 + 4 + 32 + MLDSA87_PUBLIC_KEY_SIZE;
+        ? 4 + 1 + 4 + 4 + 32 + config.privateKeySize
+        : 4 + 1 + 4 + 4 + 32 + config.publicKeySize;
     if (buffer.length !== expectedSize) {
         throw new TypeError(`Invalid buffer length: expected ${expectedSize}, got ${buffer.length}`);
     }
@@ -272,45 +271,47 @@ function fromBase58(inString) {
     offset += 32;
     // Key data
     if (isPrivate) {
-        const privateKey = buffer.slice(offset, offset + MLDSA87_PRIVATE_KEY_SIZE);
-        // Derive public key from private key (getPublicKey returns secretKey, so we need the publicKey part)
-        const publicKey = ml_dsa87.getPublicKey(privateKey);
-        return new QuantumBIP32(privateKey, publicKey, chainCode, depth, index, parentFingerprint);
+        const privateKey = buffer.slice(offset, offset + config.privateKeySize);
+        const publicKey = config.algorithm.getPublicKey(privateKey);
+        return new QuantumBIP32(privateKey, publicKey, chainCode, config, depth, index, parentFingerprint);
     }
     else {
-        const publicKey = buffer.slice(offset, offset + MLDSA87_PUBLIC_KEY_SIZE);
-        return new QuantumBIP32(undefined, publicKey, chainCode, depth, index, parentFingerprint);
+        const publicKey = buffer.slice(offset, offset + config.publicKeySize);
+        return new QuantumBIP32(undefined, publicKey, chainCode, config, depth, index, parentFingerprint);
     }
 }
 /**
  * Create quantum key from public key and chain code
  */
-function fromPublicKey(publicKey, chainCode) {
-    if (publicKey.length !== MLDSA87_PUBLIC_KEY_SIZE) {
-        throw new TypeError(`Invalid public key length: expected ${MLDSA87_PUBLIC_KEY_SIZE}, got ${publicKey.length}`);
+function fromPublicKey(publicKey, chainCode, securityLevel = DEFAULT_SECURITY_LEVEL) {
+    const config = getMLDSAConfig(securityLevel);
+    if (publicKey.length !== config.publicKeySize) {
+        throw new TypeError(`Invalid public key length for ML-DSA-${securityLevel}: expected ${config.publicKeySize}, got ${publicKey.length}`);
     }
     if (chainCode.length !== CHAIN_CODE_SIZE) {
         throw new TypeError(`Invalid chain code length: expected ${CHAIN_CODE_SIZE}, got ${chainCode.length}`);
     }
-    return new QuantumBIP32(undefined, publicKey, chainCode, 0, 0, 0);
+    return new QuantumBIP32(undefined, publicKey, chainCode, config, 0, 0, 0);
 }
 /**
  * Create quantum key from private key and chain code
  */
-function fromPrivateKey(privateKey, chainCode) {
-    if (privateKey.length !== MLDSA87_PRIVATE_KEY_SIZE) {
-        throw new TypeError(`Invalid private key length: expected ${MLDSA87_PRIVATE_KEY_SIZE}, got ${privateKey.length}`);
+function fromPrivateKey(privateKey, chainCode, securityLevel = DEFAULT_SECURITY_LEVEL) {
+    const config = getMLDSAConfig(securityLevel);
+    if (privateKey.length !== config.privateKeySize) {
+        throw new TypeError(`Invalid private key length for ML-DSA-${securityLevel}: expected ${config.privateKeySize}, got ${privateKey.length}`);
     }
     if (chainCode.length !== CHAIN_CODE_SIZE) {
         throw new TypeError(`Invalid chain code length: expected ${CHAIN_CODE_SIZE}, got ${chainCode.length}`);
     }
     // Derive public key from private key
-    const publicKey = ml_dsa87.getPublicKey(privateKey);
-    return new QuantumBIP32(privateKey, publicKey, chainCode, 0, 0, 0);
+    const publicKey = config.algorithm.getPublicKey(privateKey);
+    return new QuantumBIP32(privateKey, publicKey, chainCode, config, 0, 0, 0);
 }
 /**
  * Quantum BIP32 Factory
- * Provides API for creating and managing ML-DSA-87 hierarchical deterministic keys
+ * Provides API for creating and managing ML-DSA hierarchical deterministic keys
+ * Supports ML-DSA-44 (default), ML-DSA-65, and ML-DSA-87
  */
 export const QuantumBIP32Factory = {
     fromSeed,

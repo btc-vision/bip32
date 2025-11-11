@@ -3,7 +3,7 @@
 
 A [BIP32](https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki) compatible library written in TypeScript with transpiled JavaScript committed to git.
 
-**Now with quantum-resistant signatures using ML-DSA-87 (FIPS 204)** - See [BIP-360](https://bip360.org/) for the quantum resistance proposal.
+**Now with quantum-resistant signatures using ML-DSA (FIPS 204)** - Supports ML-DSA-44, ML-DSA-65, and ML-DSA-87. See [BIP-360](https://bip360.org/) for the quantum resistance proposal.
 
 ## Table of Contents
 
@@ -18,7 +18,7 @@ A [BIP32](https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki) compat
 
 ## Quantum-Resistant Features
 
-This library now supports **quantum-resistant hierarchical deterministic key derivation** using **ML-DSA-87** (FIPS 204), aligned with [BIP-360](https://bip360.org/)'s vision for post-quantum Bitcoin.
+This library now supports **quantum-resistant hierarchical deterministic key derivation** using **ML-DSA** (FIPS 204), aligned with [BIP-360](https://bip360.org/)'s vision for post-quantum Bitcoin.
 
 ### What is BIP-360?
 
@@ -31,21 +31,38 @@ This library now supports **quantum-resistant hierarchical deterministic key der
 - **Recent Developments**: Google's "Willow" chip and Microsoft's Majorana 1 chip demonstrate rapid quantum computing advancement
 - **Bitcoin at Risk**: Current Bitcoin addresses are not quantum-resistant and require a comprehensive transition plan
 
-### ML-DSA-87 (Module-Lattice Digital Signature Algorithm)
+### ML-DSA (Module-Lattice Digital Signature Algorithm)
 
 - **Standard**: FIPS 204 (NIST Post-Quantum Cryptography)
-- **Security Level**: Category 5 (256-bit security, equivalent to AES-256)
 - **Type**: Lattice-based cryptography (based on CRYSTALS-Dilithium)
 - **Quantum Resistant**: Secure against both classical and quantum attacks
-- **Key Sizes**:
-  - Private key: 4,896 bytes
-  - Public key: 2,592 bytes
-  - Signature: 4,627 bytes
+- **Security Levels**: Three levels supported:
+  - **ML-DSA-44** (LEVEL2): 128-bit classical security - **Default**
+  - **ML-DSA-65** (LEVEL3): 192-bit classical security
+  - **ML-DSA-87** (LEVEL5): 256-bit classical security
+
+### Key Sizes by Security Level
+
+| Security Level | Private Key | Public Key | Signature | Base58 Export |
+|----------------|-------------|------------|-----------|---------------|
+| LEVEL2 (44) - Default | 2,560 bytes | 1,312 bytes | 2,420 bytes | ~3,563 chars |
+| LEVEL3 (65) | 4,032 bytes | 1,952 bytes | 3,309 bytes | ~5,589 chars |
+| LEVEL5 (87) | 4,896 bytes | 2,592 bytes | 4,627 bytes | ~6,804 chars |
+
+### Key Features
+
+- **Full BIP-32 Compatibility**: Uses standard hierarchical derivation paths (e.g., `m/360'/0'/0'/0/0`)
+- **Multiple Security Levels**: Choose between LEVEL2, LEVEL3, or LEVEL5 based on your needs
+- **Type-Safe API**: Use `MLDSASecurityLevel` enum for security levels
+- **Deterministic**: Same seed always generates the same quantum keys
+- **Future-Proof**: Meets post-2030 and post-2035 security requirements
+- **Production-Ready**: Comprehensive test coverage
+- **Built on Standards**: Uses `@btc-vision/post-quantum` for ML-DSA implementation
 
 ### Important Note: Key Derivation Differences
 
 Unlike traditional ECDSA BIP-32:
-- **Neutered (public-only) keys CANNOT derive children** - ML-DSA-87 does not support public key derivation
+- **Neutered (public-only) keys CANNOT derive children** - ML-DSA does not support public key derivation
 - All derivations require the private key
 - This is a fundamental property of lattice-based cryptography
 
@@ -90,16 +107,24 @@ const child = node.derivePath('m/0/0');
 ### TypeScript
 
 ```typescript
-import { QuantumBIP32Factory } from '@btc-vision/bip32';
+import {
+  QuantumBIP32Factory,
+  MLDSASecurityLevel,
+  QuantumDerivationPath
+} from '@btc-vision/bip32';
 
-// No ECC library needed - ML-DSA-87 is built-in
+// No ECC library needed - ML-DSA is built-in
 const seed = Buffer.from('your-seed-here', 'hex');
 
-// Create master quantum key
+// Create master quantum key (default: ML-DSA-44 / LEVEL2)
 const master = QuantumBIP32Factory.fromSeed(seed);
 
-// Derive child using BIP-360 path (m/360'/...)
-const child = master.derivePath("m/360'/0'/0'/0/0");
+// Or specify security level explicitly
+const masterLevel5 = QuantumBIP32Factory.fromSeed(seed, MLDSASecurityLevel.LEVEL5);
+const masterLevel3 = QuantumBIP32Factory.fromSeed(seed, MLDSASecurityLevel.LEVEL3);
+
+// Derive child using standard BIP-360 path
+const child = master.derivePath(QuantumDerivationPath.STANDARD);
 
 // Sign a transaction
 const txHash = Buffer.from('...transaction hash...');
@@ -112,18 +137,28 @@ console.log('Signature valid:', isValid);
 // Export for backup
 const exported = child.toBase58();
 
-// Import from backup
+// Import from backup (security level auto-detected)
 const imported = QuantumBIP32Factory.fromBase58(exported);
 ```
 
 ### NodeJS (CommonJS)
 
 ```javascript
-const { QuantumBIP32Factory } = require('@btc-vision/bip32');
+const {
+  QuantumBIP32Factory,
+  MLDSASecurityLevel,
+  QuantumDerivationPath
+} = require('@btc-vision/bip32');
 
 const seed = Buffer.from('your-seed-here', 'hex');
+
+// Default: ML-DSA-44 (LEVEL2)
 const master = QuantumBIP32Factory.fromSeed(seed);
-const child = master.derivePath("m/360'/0'/0'/0/0");
+
+// Or specify security level
+const masterLevel5 = QuantumBIP32Factory.fromSeed(seed, MLDSASecurityLevel.LEVEL5);
+
+const child = master.derivePath(QuantumDerivationPath.STANDARD);
 
 const txHash = Buffer.from('...transaction hash...');
 const signature = child.sign(txHash);
@@ -146,7 +181,7 @@ try {
   console.log('Cannot sign with neutered key');
 }
 
-// IMPORTANT: Cannot derive children (ML-DSA-87 limitation)
+// IMPORTANT: Cannot derive children (ML-DSA limitation)
 try {
   neutered.derive(0);
 } catch (e) {
@@ -164,15 +199,17 @@ Current Bitcoin uses **ECDSA (secp256k1)** for signatures, which is vulnerable t
 
 | Algorithm | Quantum Safe | Key Size | Signature Size | Year Standardized |
 |-----------|-------------|----------|----------------|-------------------|
-| ECDSA (secp256k1) | ❌ No | 32 bytes | 64-73 bytes | 1999 |
-| ML-DSA-87 | ✅ Yes | 4,896 bytes | 4,627 bytes | 2024 (FIPS 204) |
+| ECDSA (secp256k1) | No | 32 bytes | 64-73 bytes | 1999 |
+| ML-DSA-44 | Yes | 2,560 bytes | 2,420 bytes | 2024 (FIPS 204) |
+| ML-DSA-65 | Yes | 4,032 bytes | 3,309 bytes | 2024 (FIPS 204) |
+| ML-DSA-87 | Yes | 4,896 bytes | 4,627 bytes | 2024 (FIPS 204) |
 
 ### The Solution
 
-**ML-DSA-87** (Module-Lattice Digital Signature Algorithm) is:
+**ML-DSA** (Module-Lattice Digital Signature Algorithm) is:
 - **NIST Standardized**: FIPS 204, approved August 2024
 - **Lattice-Based**: Security based on hard mathematical problems resistant to quantum attacks
-- **Category 5 Security**: 256-bit security level (highest NIST standard)
+- **Multiple Security Levels**: Choose between 128-bit, 192-bit, or 256-bit classical security
 - **Battle-Tested**: Based on CRYSTALS-Dilithium (NIST PQC competition winner)
 
 ### BIP-360 Transition Plan
@@ -189,18 +226,32 @@ As stated on [bip360.org](https://bip360.org/):
 
 ### When to Use Quantum Keys
 
-Use **ML-DSA-87** for:
-- ✅ Long-term storage (10+ years)
-- ✅ High-value transactions
-- ✅ Future-proofing against quantum threats
-- ✅ Compliance with post-2030/2035 requirements
+Use **ML-DSA** for:
+- Long-term storage (10+ years)
+- High-value transactions
+- Future-proofing against quantum threats
+- Compliance with post-2030/2035 requirements
 
 Continue using **ECDSA** for:
-- ✅ Current Bitcoin protocol (no consensus changes yet)
-- ✅ Existing wallets and addresses
-- ✅ Smaller transaction sizes
+- Current Bitcoin protocol (no consensus changes yet)
+- Existing wallets and addresses
+- Smaller transaction sizes
 
 **Hybrid approach**: Maintain both traditional and quantum keys during the transition period.
+
+### Choosing a Security Level
+
+- **ML-DSA-44 (LEVEL2)** - Default, smallest keys, 128-bit classical security
+  - Best for: Most applications, mobile wallets, general use
+  - Equivalent to: AES-128, SHA-256 (first 128 bits)
+
+- **ML-DSA-65 (LEVEL3)** - Balanced, 192-bit classical security
+  - Best for: Enhanced security without extreme size increase
+  - Equivalent to: AES-192
+
+- **ML-DSA-87 (LEVEL5)** - Maximum security, 256-bit classical security
+  - Best for: High-value assets, long-term storage, government/military
+  - Equivalent to: AES-256, full SHA-256
 
 ---
 
@@ -219,8 +270,8 @@ Both traditional and quantum APIs available:
 // Traditional (requires ECC)
 import { BIP32Factory } from '@btc-vision/bip32';
 
-// Quantum (no ECC needed)
-import { QuantumBIP32Factory } from '@btc-vision/bip32';
+// Quantum (no ECC needed, supports ML-DSA-44, ML-DSA-65, ML-DSA-87)
+import { QuantumBIP32Factory, MLDSASecurityLevel } from '@btc-vision/bip32';
 ```
 
 Full API documentation in [QUANTUM.md](./QUANTUM.md).

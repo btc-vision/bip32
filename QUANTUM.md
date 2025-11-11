@@ -1,29 +1,35 @@
-# Quantum-Resistant BIP32 with ML-DSA-87
+# Quantum-Resistant BIP32 with ML-DSA
 
-This library provides quantum-resistant hierarchical deterministic key derivation using **ML-DSA-87** (FIPS 204) - a lattice-based digital signature algorithm that provides **Level 5 security** (256-bit classical security equivalent).
+This library provides quantum-resistant hierarchical deterministic key derivation using **ML-DSA** (FIPS 204) - a lattice-based digital signature algorithm. Supports three security levels:
+- **ML-DSA-44** (LEVEL2): 128-bit classical security - **Default**
+- **ML-DSA-65** (LEVEL3): 192-bit classical security
+- **ML-DSA-87** (LEVEL5): 256-bit classical security
 
 ## Overview
 
-### The Challenge with ML-DSA-87 and BIP-32
+### The Challenge with ML-DSA and BIP-32
 
-Traditional BIP-32 uses HMAC-SHA512 to derive 256-bit private keys for elliptic curve cryptography (like secp256k1). However, ML-DSA-87 doesn't use simple 256-bit scalars as private keys. Instead, ML-DSA-87 private keys are **4896 bytes** containing polynomial vectors and matrices in the Dilithium lattice structure.
+Traditional BIP-32 uses HMAC-SHA512 to derive 256-bit private keys for elliptic curve cryptography (like secp256k1). However, ML-DSA doesn't use simple 256-bit scalars as private keys. Instead, ML-DSA private keys contain polynomial vectors and matrices in the Dilithium lattice structure (size varies by security level: 2560-4896 bytes).
 
 ### Our Solution
 
-We use BIP-32 for **hierarchical seed derivation**, then use that seed for ML-DSA-87's native key generation:
+We use BIP-32 for **hierarchical seed derivation**, then use that seed for ML-DSA's native key generation:
 
 ```
 1. Standard BIP-32: mnemonic → seed → HMAC-SHA512 chain → child seeds
 2. At derivation path: Take the 256-bit output (IL)
-3. Use as entropy for ML-DSA-87: ml_dsa87.keygen(IL)
-4. Produces proper ML-DSA-87 keypair (4896-byte private, 2592-byte public)
+3. Use as entropy for ML-DSA: ml_dsa.keygen(IL)
+4. Produces proper ML-DSA keypair (sizes vary by security level)
 ```
 
-This maintains the critical property that **the same mnemonic always generates the same quantum keys** while respecting ML-DSA-87's mathematical requirements.
+This maintains the critical property that **the same mnemonic always generates the same quantum keys** while respecting ML-DSA's mathematical requirements.
 
 ## Features
 
-- ✅ **Quantum-Resistant**: ML-DSA-87 provides Level 5 security (256-bit classical security)
+- ✅ **Quantum-Resistant**: ML-DSA provides post-quantum security
+- ✅ **Multiple Security Levels**: Choose between LEVEL2 (44), LEVEL3 (65), or LEVEL5 (87)
+- ✅ **Type-Safe Enums**: Use `MLDSASecurityLevel` enum for security levels
+- ✅ **Standard Derivation Paths**: Use `QuantumDerivationPath` enum for paths
 - ✅ **BIP-32 Compatible**: Uses standard BIP-32 hierarchical derivation paths
 - ✅ **Deterministic**: Same seed always produces same keys
 - ✅ **Audited Library**: Built on [@btc-vision/post-quantum](https://www.npmjs.com/package/@btc-vision/post-quantum)
@@ -40,15 +46,27 @@ npm install @btc-vision/bip32
 ### Basic Example
 
 ```typescript
-import { QuantumBIP32Factory } from '@btc-vision/bip32';
+import {
+  QuantumBIP32Factory,
+  MLDSASecurityLevel,
+  QuantumDerivationPath,
+} from '@btc-vision/bip32';
 import { randomBytes } from 'crypto';
 
 // 1. Create master key from seed (use BIP39 mnemonic in production)
 const seed = randomBytes(32);
+
+// Default: ML-DSA-44 (LEVEL2)
 const master = QuantumBIP32Factory.fromSeed(seed);
 
-// 2. Derive child key at path m/360'/0'/0'/0/0
-const child = master.derivePath("m/360'/0'/0'/0/0");
+// Or specify security level explicitly
+const masterHighSec = QuantumBIP32Factory.fromSeed(
+  seed,
+  MLDSASecurityLevel.LEVEL5
+);
+
+// 2. Derive child key using standard path enum
+const child = master.derivePath(QuantumDerivationPath.STANDARD);
 
 // 3. Sign a message
 const message = new TextEncoder().encode('Hello, quantum world!');
@@ -67,8 +85,11 @@ const account = master.deriveHardened(360);
 const chain = account.deriveHardened(0);
 const address = chain.deriveHardened(0);
 
-// Or use path notation
-const key = master.derivePath("m/360'/0'/0'/0/0");
+// Or use path notation with enum
+const key = master.derivePath(QuantumDerivationPath.STANDARD);
+
+// Or use a custom path
+const customKey = master.derivePath("m/360'/0'/0'/0/0");
 ```
 
 ### Export/Import Keys
@@ -195,10 +216,14 @@ const child = key.deriveHardened(360);
 
 ##### `derivePath(path: string): QuantumBIP32Interface`
 
-Derive using BIP32 path notation.
+Derive using BIP32 path notation. Use `QuantumDerivationPath` enum for standard paths.
 
 ```typescript
-const child = key.derivePath("m/360'/0'/0'/0/0");
+// Using enum (recommended)
+const child = key.derivePath(QuantumDerivationPath.STANDARD);
+
+// Or custom path
+const customChild = key.derivePath("m/360'/0'/0'/0/0");
 ```
 
 ##### `isNeutered(): boolean`
@@ -225,15 +250,43 @@ Export to base58-encoded string (~6753 chars).
 const exported = key.toBase58();
 ```
 
-## Key Sizes
+## Security Levels and Key Sizes
 
-| Component | Size | Description |
-|-----------|------|-------------|
-| Private Key | 4896 bytes | ML-DSA-87 secret key |
-| Public Key | 2592 bytes | ML-DSA-87 public key |
-| Signature | 4627 bytes | ML-DSA-87 signature |
-| Chain Code | 32 bytes | BIP32 chain code |
-| Base58 Export | ~6753 chars | Encoded extended key |
+ML-DSA supports three NIST security levels, selectable via the `MLDSASecurityLevel` enum:
+
+```typescript
+enum MLDSASecurityLevel {
+  LEVEL2 = 44,  // ML-DSA-44 (default)
+  LEVEL3 = 65,  // ML-DSA-65
+  LEVEL5 = 87,  // ML-DSA-87
+}
+```
+
+### Key Sizes by Security Level
+
+| Security Level | Private Key | Public Key | Signature | Base58 Export |
+|----------------|-------------|------------|-----------|---------------|
+| LEVEL2 (44) **Default** | 2,560 bytes | 1,312 bytes | 2,420 bytes | ~3,563 chars |
+| LEVEL3 (65) | 4,032 bytes | 1,952 bytes | 3,309 bytes | ~5,589 chars |
+| LEVEL5 (87) | 4,896 bytes | 2,592 bytes | 4,627 bytes | ~6,804 chars |
+
+**Common Components:**
+- Chain Code: 32 bytes (all levels)
+- Seed: 32 bytes (all levels)
+
+### Choosing a Security Level
+
+- **LEVEL2 (ML-DSA-44)** - Default, smallest keys, 128-bit classical security
+  - Best for: Most applications, mobile wallets, general use
+  - Equivalent to: AES-128, SHA-256 (first 128 bits)
+
+- **LEVEL3 (ML-DSA-65)** - Balanced, 192-bit classical security
+  - Best for: Enhanced security without extreme size increase
+  - Equivalent to: AES-192
+
+- **LEVEL5 (ML-DSA-87)** - Maximum security, 256-bit classical security
+  - Best for: High-value assets, long-term storage, government/military
+  - Equivalent to: AES-256, full SHA-256
 
 ## Security Considerations
 
@@ -246,21 +299,32 @@ ML-DSA-87 provides **Category 5 security** according to NIST, which is equivalen
 
 ### Recommended Derivation Path
 
-We recommend using the path prefix `m/360'/` for quantum keys:
+We recommend using the `QuantumDerivationPath` enum for quantum keys:
 
 ```typescript
-const quantum = master.derivePath("m/360'/0'/0'/0/0");
+// Using the standard quantum path (recommended)
+const quantum = master.derivePath(QuantumDerivationPath.STANDARD);
+
+// Available enum values:
+// - QuantumDerivationPath.STANDARD (m/360'/0'/0'/0/0)
+// - QuantumDerivationPath.CHANGE (m/360'/0'/0'/1/0)
+// - QuantumDerivationPath.ACCOUNT_0_ADDRESS_0 (m/360'/0'/0'/0/0)
+// - QuantumDerivationPath.ACCOUNT_0_ADDRESS_1 (m/360'/0'/0'/0/1)
+// - QuantumDerivationPath.ACCOUNT_1_ADDRESS_0 (m/360'/1'/0'/0/0)
 ```
 
-The `360'` is chosen to avoid conflicts with existing BIP-44 coin types while being memorable.
+The `360'` coin type is chosen to avoid conflicts with existing BIP-44 coin types while being memorable.
 
 ### Hardened Derivation
 
 **Always use hardened derivation** for quantum keys to prevent chain code attacks:
 
 ```typescript
-// Good: All hardened
-const good = master.derivePath("m/360'/0'/0'/0'");
+// Good: All hardened (using enum)
+const good = master.derivePath(QuantumDerivationPath.STANDARD);
+
+// Or manually with all hardened indices
+const goodManual = master.derivePath("m/360'/0'/0'/0'");
 
 // Risky: Non-hardened at end
 const risky = master.derivePath("m/360'/0'/0'/0");
@@ -326,20 +390,24 @@ We hash them to 32 bytes before using in the HMAC chain. This maintains security
 ## Example: Complete Workflow
 
 ```typescript
-import { QuantumBIP32Factory } from '@btc-vision/bip32';
+import {
+  QuantumBIP32Factory,
+  MLDSASecurityLevel,
+  QuantumDerivationPath
+} from '@btc-vision/bip32';
 import { randomBytes } from 'crypto';
 
 // 1. Generate seed (in production, use BIP39)
 const seed = randomBytes(32);
 
-// 2. Create master key
+// 2. Create master key (default: ML-DSA-44 / LEVEL2)
 const master = QuantumBIP32Factory.fromSeed(seed);
 console.log('Master created');
 console.log('  Public key:', master.publicKey.length, 'bytes');
 console.log('  Private key:', master.privateKey.length, 'bytes');
 
-// 3. Derive account key
-const account = master.derivePath("m/360'/0'/0'/0/0");
+// 3. Derive account key using enum
+const account = master.derivePath(QuantumDerivationPath.STANDARD);
 console.log('\nAccount key derived');
 console.log('  Depth:', account.depth);
 console.log('  Index:', account.index);

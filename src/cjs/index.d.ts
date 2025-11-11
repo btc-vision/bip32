@@ -1,2 +1,3 @@
 export { BIP32Factory as default, BIP32Factory, BIP32Interface, BIP32API, TinySecp256k1Interface, } from './bip32.js';
-export { QuantumBIP32Factory, QuantumBIP32Interface, QuantumBIP32API, QuantumSigner, MLDSA87KeyPair, } from './quantum/index.js';
+export { QuantumBIP32Factory, QuantumBIP32Interface, QuantumBIP32API, QuantumSigner, MLDSAKeyPair, MLDSASecurityLevel, MLDSAConfig, MLDSA_CONFIGS, DEFAULT_SECURITY_LEVEL, getMLDSAConfig } from './quantum/index.js';
+export { DerivationPath, QuantumDerivationPath, getQuantumPath, getBitcoinPath, } from './derivation-paths.js';

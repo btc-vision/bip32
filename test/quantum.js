@@ -1,4 +1,8 @@
-import { QuantumBIP32Factory } from '../src/esm/index.js';
+import {
+  QuantumBIP32Factory,
+  MLDSASecurityLevel,
+  QuantumDerivationPath,
+} from '../src/esm/index.js';
 import tape from 'tape';
 import * as tools from 'uint8array-tools';
 import { base58check } from '@scure/base';
@@ -18,8 +22,8 @@ tape('QuantumBIP32Factory.fromSeed', (t) => {
     t.equal(master.depth, 0);
     t.equal(master.index, 0);
     t.equal(master.parentFingerprint, 0);
-    t.equal(master.publicKey.length, 2592);
-    t.equal(master.privateKey.length, 4896);
+    t.equal(master.publicKey.length, 1312); // ML-DSA-44 (default)
+    t.equal(master.privateKey.length, 2560); // ML-DSA-44 (default)
     t.equal(master.chainCode.length, 32);
     t.equal(master.isNeutered(), false);
     t.end();
@@ -60,8 +64,8 @@ tape('QuantumBIP32 derivation', (t) => {
 
     t.equal(child.depth, 1);
     t.equal(child.index, 0x80000000);
-    t.equal(child.publicKey.length, 2592);
-    t.equal(child.privateKey.length, 4896);
+    t.equal(child.publicKey.length, 1312); // ML-DSA-44 (default)
+    t.equal(child.privateKey.length, 2560); // ML-DSA-44 (default)
     t.notEqual(tools.toHex(child.publicKey), tools.toHex(master.publicKey));
     t.end();
   });
@@ -71,13 +75,13 @@ tape('QuantumBIP32 derivation', (t) => {
 
     t.equal(child.depth, 1);
     t.equal(child.index, 0);
-    t.equal(child.publicKey.length, 2592);
-    t.equal(child.privateKey.length, 4896);
+    t.equal(child.publicKey.length, 1312); // ML-DSA-44 (default)
+    t.equal(child.privateKey.length, 2560); // ML-DSA-44 (default)
     t.end();
   });
 
   t.test('derivePath with hardened path', (t) => {
-    const child = master.derivePath("m/360'/0'/0'/0/0");
+    const child = master.derivePath(QuantumDerivationPath.STANDARD);
 
     t.equal(child.depth, 5);
     t.equal(child.index, 0);
@@ -100,8 +104,8 @@ tape('QuantumBIP32 derivation', (t) => {
   });
 
   t.test('produces deterministic child keys', (t) => {
-    const child1 = master.derivePath("m/360'/0'/0'/0/0");
-    const child2 = master.derivePath("m/360'/0'/0'/0/0");
+    const child1 = master.derivePath(QuantumDerivationPath.STANDARD);
+    const child2 = master.derivePath(QuantumDerivationPath.STANDARD);
 
     t.equal(tools.toHex(child1.publicKey), tools.toHex(child2.publicKey));
     t.equal(tools.toHex(child1.privateKey), tools.toHex(child2.privateKey));
@@ -109,8 +113,8 @@ tape('QuantumBIP32 derivation', (t) => {
   });
 
   t.test('different paths produce different keys', (t) => {
-    const child1 = master.derivePath("m/360'/0'/0'/0/0");
-    const child2 = master.derivePath("m/360'/0'/0'/0/1");
+    const child1 = master.derivePath(QuantumDerivationPath.ACCOUNT_0_ADDRESS_0);
+    const child2 = master.derivePath(QuantumDerivationPath.ACCOUNT_0_ADDRESS_1);
 
     t.notEqual(tools.toHex(child1.publicKey), tools.toHex(child2.publicKey));
     t.end();
@@ -171,7 +175,7 @@ tape('QuantumBIP32 neutered keys', (t) => {
   t.test('neutered key cannot derive any children', (t) => {
     const neutered = master.neutered();
 
-    // ML-DSA-87 cannot derive children without private key (unlike EC)
+    // ML-DSA cannot derive children without private key (unlike EC)
     t.throws(() => neutered.derive(0), /Cannot derive child keys without private key/);
     t.throws(() => neutered.derive(0x80000000), /Cannot derive child keys without private key/);
     t.throws(() => neutered.deriveHardened(0), /Cannot derive child keys without private key/);
@@ -190,7 +194,7 @@ tape('QuantumBIP32 signing and verification', (t) => {
     message.fill(0x42);
     const signature = master.sign(message);
 
-    t.equal(signature.length, 4627);
+    t.equal(signature.length, 2420); // ML-DSA-44 (default)
     t.equal(master.verify(message, signature), true);
     t.end();
   });
@@ -365,7 +369,7 @@ tape('QuantumBIP32 base58 import/export', (t) => {
   });
 
   t.test('child key export includes correct metadata', (t) => {
-    const child = master.derivePath("m/360'/0'/0'/0/0");
+    const child = master.derivePath(QuantumDerivationPath.STANDARD);
     const exported = child.toBase58();
     const imported = QuantumBIP32Factory.fromBase58(exported);
 
@@ -529,14 +533,135 @@ tape('QuantumBIP32 edge cases', (t) => {
   t.end();
 });
 
+tape('QuantumBIP32 security levels', (t) => {
+  const seed = tools.fromHex('000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f');
+
+  t.test('default security level is LEVEL2 (44)', (t) => {
+    const master = QuantumBIP32Factory.fromSeed(seed);
+    t.equal(master.securityLevel, MLDSASecurityLevel.LEVEL2);
+    t.equal(master.publicKey.length, 1312); // ML-DSA-44
+    t.equal(master.privateKey.length, 2560); // ML-DSA-44
+    t.end();
+  });
+
+  t.test('creates ML-DSA-44 key using enum', (t) => {
+    const master = QuantumBIP32Factory.fromSeed(seed, MLDSASecurityLevel.LEVEL2);
+    t.equal(master.securityLevel, MLDSASecurityLevel.LEVEL2);
+    t.equal(master.publicKey.length, 1312);
+    t.equal(master.privateKey.length, 2560);
+
+    const message = new Uint8Array(32).fill(0x42);
+    const signature = master.sign(message);
+    t.equal(signature.length, 2420);
+    t.equal(master.verify(message, signature), true);
+    t.end();
+  });
+
+  t.test('creates ML-DSA-65 key using enum', (t) => {
+    const master = QuantumBIP32Factory.fromSeed(seed, MLDSASecurityLevel.LEVEL3);
+    t.equal(master.securityLevel, MLDSASecurityLevel.LEVEL3);
+    t.equal(master.publicKey.length, 1952);
+    t.equal(master.privateKey.length, 4032);
+
+    const message = new Uint8Array(32).fill(0x42);
+    const signature = master.sign(message);
+    t.equal(signature.length, 3309);
+    t.equal(master.verify(message, signature), true);
+    t.end();
+  });
+
+  t.test('creates ML-DSA-87 key using enum', (t) => {
+    const master = QuantumBIP32Factory.fromSeed(seed, MLDSASecurityLevel.LEVEL5);
+    t.equal(master.securityLevel, MLDSASecurityLevel.LEVEL5);
+    t.equal(master.publicKey.length, 2592);
+    t.equal(master.privateKey.length, 4896);
+
+    const message = new Uint8Array(32).fill(0x42);
+    const signature = master.sign(message);
+    t.equal(signature.length, 4627);
+    t.equal(master.verify(message, signature), true);
+    t.end();
+  });
+
+  t.test('child keys inherit security level', (t) => {
+    const master44 = QuantumBIP32Factory.fromSeed(seed, MLDSASecurityLevel.LEVEL2);
+    const child44 = master44.deriveHardened(0);
+    t.equal(child44.securityLevel, MLDSASecurityLevel.LEVEL2);
+
+    const master87 = QuantumBIP32Factory.fromSeed(seed, MLDSASecurityLevel.LEVEL5);
+    const child87 = master87.deriveHardened(0);
+    t.equal(child87.securityLevel, MLDSASecurityLevel.LEVEL5);
+    t.end();
+  });
+
+  t.test('fromPublicKey supports security levels', (t) => {
+    const master44 = QuantumBIP32Factory.fromSeed(seed, MLDSASecurityLevel.LEVEL2);
+    const key44 = QuantumBIP32Factory.fromPublicKey(master44.publicKey, master44.chainCode, MLDSASecurityLevel.LEVEL2);
+    t.equal(key44.securityLevel, MLDSASecurityLevel.LEVEL2);
+
+    const master87 = QuantumBIP32Factory.fromSeed(seed, MLDSASecurityLevel.LEVEL5);
+    const key87 = QuantumBIP32Factory.fromPublicKey(master87.publicKey, master87.chainCode, MLDSASecurityLevel.LEVEL5);
+    t.equal(key87.securityLevel, MLDSASecurityLevel.LEVEL5);
+    t.end();
+  });
+
+  t.test('fromPrivateKey supports security levels', (t) => {
+    const master44 = QuantumBIP32Factory.fromSeed(seed, MLDSASecurityLevel.LEVEL2);
+    const key44 = QuantumBIP32Factory.fromPrivateKey(master44.privateKey, master44.chainCode, MLDSASecurityLevel.LEVEL2);
+    t.equal(key44.securityLevel, MLDSASecurityLevel.LEVEL2);
+
+    const master87 = QuantumBIP32Factory.fromSeed(seed, MLDSASecurityLevel.LEVEL5);
+    const key87 = QuantumBIP32Factory.fromPrivateKey(master87.privateKey, master87.chainCode, MLDSASecurityLevel.LEVEL5);
+    t.equal(key87.securityLevel, MLDSASecurityLevel.LEVEL5);
+    t.end();
+  });
+
+  t.test('base58 encoding preserves security level', (t) => {
+    const master44 = QuantumBIP32Factory.fromSeed(seed, MLDSASecurityLevel.LEVEL2);
+    const exported44 = master44.toBase58();
+    const imported44 = QuantumBIP32Factory.fromBase58(exported44);
+    t.equal(imported44.securityLevel, MLDSASecurityLevel.LEVEL2);
+
+    const master87 = QuantumBIP32Factory.fromSeed(seed, MLDSASecurityLevel.LEVEL5);
+    const exported87 = master87.toBase58();
+    const imported87 = QuantumBIP32Factory.fromBase58(exported87);
+    t.equal(imported87.securityLevel, MLDSASecurityLevel.LEVEL5);
+    t.end();
+  });
+
+  t.test('throws on invalid security level', (t) => {
+    t.throws(() => QuantumBIP32Factory.fromSeed(seed, 99), /Invalid ML-DSA security level/);
+    t.end();
+  });
+
+  t.test('different security levels produce different keys', (t) => {
+    const master44 = QuantumBIP32Factory.fromSeed(seed, MLDSASecurityLevel.LEVEL2);
+    const master87 = QuantumBIP32Factory.fromSeed(seed, MLDSASecurityLevel.LEVEL5);
+
+    // Keys should be different even with same seed
+    t.notEqual(tools.toHex(master44.publicKey), tools.toHex(master87.publicKey));
+    t.end();
+  });
+
+  t.test('derivation path enum works', (t) => {
+    const master = QuantumBIP32Factory.fromSeed(seed);
+    const child = master.derivePath(QuantumDerivationPath.STANDARD);
+    t.equal(child.depth, 5);
+    t.equal(child.index, 0);
+    t.end();
+  });
+
+  t.end();
+});
+
 tape('QuantumBIP32 compatibility', (t) => {
   t.test('same seed produces same keys across instances', (t) => {
     const seed = tools.fromHex('ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff');
     const master1 = QuantumBIP32Factory.fromSeed(seed);
     const master2 = QuantumBIP32Factory.fromSeed(seed);
 
-    const child1 = master1.derivePath("m/360'/0'/0'/0/0");
-    const child2 = master2.derivePath("m/360'/0'/0'/0/0");
+    const child1 = master1.derivePath(QuantumDerivationPath.STANDARD);
+    const child2 = master2.derivePath(QuantumDerivationPath.STANDARD);
 
     t.equal(tools.toHex(child1.privateKey), tools.toHex(child2.privateKey));
     t.equal(tools.toHex(child1.publicKey), tools.toHex(child2.publicKey));
