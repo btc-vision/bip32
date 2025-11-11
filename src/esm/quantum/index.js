@@ -39,6 +39,6 @@
  */
 // Export the generic ML-DSA implementation (supports 44, 65, 87)
 export { QuantumBIP32Factory } from './mldsa.js';
-export { MLDSASecurityLevel, MLDSA_CONFIGS, DEFAULT_SECURITY_LEVEL, getMLDSAConfig } from './config.js';
+export { MLDSASecurityLevel, DEFAULT_SECURITY_LEVEL, getMLDSAConfig, } from './config.js';
 // Re-export derivation path enums for convenience
 export { DerivationPath, QuantumDerivationPath, getQuantumPath, getBitcoinPath, } from '../derivation-paths.js';

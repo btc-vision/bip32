@@ -6,6 +6,10 @@ export {
   TinySecp256k1Interface,
 } from './bip32.js';
 
+// Network configurations
+export { BITCOIN, TESTNET, REGTEST } from './networks.js';
+export type { Network } from './types.js';
+
 // Quantum-resistant BIP32 using ML-DSA
 export {
   QuantumBIP32Factory,
@@ -15,9 +19,8 @@ export {
   MLDSAKeyPair,
   MLDSASecurityLevel,
   MLDSAConfig,
-  MLDSA_CONFIGS,
   DEFAULT_SECURITY_LEVEL,
-  getMLDSAConfig
+  getMLDSAConfig,
 } from './quantum/index.js';
 
 // Derivation path enums

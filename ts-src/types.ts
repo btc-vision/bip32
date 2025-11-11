@@ -25,12 +25,19 @@ export const Buffer256Bit = v.pipe(v.instance(Uint8Array), v.length(32));
 
 export const Buffer33Bytes = v.pipe(v.instance(Uint8Array), v.length(33));
 
+const Bip32Schema = v.object({
+  public: Uint32Schema,
+  private: Uint32Schema,
+});
+
 export const NetworkSchema = v.object({
   wif: Uint8Schema,
-  bip32: v.object({
-    public: Uint32Schema,
-    private: Uint32Schema,
-  }),
+  bip32: Bip32Schema,
+  messagePrefix: v.string(),
+  bech32: v.string(),
+  bech32Opnet: v.optional(v.string()),
+  pubKeyHash: Uint8Schema,
+  scriptHash: Uint8Schema,
 });
 
 export const Bip32PathSchema = v.pipe(
@@ -38,4 +45,5 @@ export const Bip32PathSchema = v.pipe(
   v.regex(/^(m\/)?(\d+'?\/)*\d+'?$/),
 );
 
+export type Bip32 = v.InferOutput<typeof Bip32Schema>;
 export type Network = v.InferOutput<typeof NetworkSchema>;

@@ -1,4 +1,5 @@
 import { ml_dsa44, ml_dsa65, ml_dsa87 } from '@btc-vision/post-quantum/ml-dsa.js';
+import { Network } from '../types.js';
 /**
  * ML-DSA security levels
  *
@@ -29,21 +30,24 @@ export interface MLDSAConfig {
     signatureSize: number;
     /** The actual ML-DSA implementation from post-quantum library */
     algorithm: typeof ml_dsa44 | typeof ml_dsa65 | typeof ml_dsa87;
-    /** BIP32 version bytes for this security level */
-    version: {
-        public: number;
-        private: number;
-    };
+    /** Network configuration */
+    network: Network;
 }
-/**
- * ML-DSA configurations for each security level
- */
-export declare const MLDSA_CONFIGS: Record<MLDSASecurityLevel, MLDSAConfig>;
 /**
  * Default security level (Level 2 - 128-bit classical security)
  */
 export declare const DEFAULT_SECURITY_LEVEL: MLDSASecurityLevel;
 /**
- * Get ML-DSA configuration for a specific security level
+ * Get ML-DSA configuration for a specific security level and network
+ * @param level - Security level (44, 65, or 87)
+ * @param network - Network configuration
  */
-export declare function getMLDSAConfig(level?: MLDSASecurityLevel): MLDSAConfig;
+export declare function getMLDSAConfig(level: MLDSASecurityLevel, network: Network): MLDSAConfig;
+/**
+ * Find matching network and determine if private/public by version bytes
+ * Used when importing from base58
+ */
+export declare function findNetworkByVersion(version: number): {
+    network: Network;
+    isPrivate: boolean;
+} | null;

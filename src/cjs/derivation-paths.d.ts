@@ -51,3 +51,13 @@ export declare function getQuantumPath(account?: number, addressIndex?: number, 
  * @returns BIP32 derivation path string
  */
 export declare function getBitcoinPath(bipType: 44 | 49 | 84 | 86, account?: number, addressIndex?: number, isChange?: boolean): string;
+/**
+ * Type representing valid derivation paths for standard BIP32
+ * Can be an enum value or any custom BIP32 path string
+ */
+export type DerivationPathType = DerivationPath | string;
+/**
+ * Type representing valid derivation paths for quantum BIP32
+ * Can be an enum value or any custom BIP32 path string
+ */
+export type QuantumDerivationPathType = QuantumDerivationPath | string;

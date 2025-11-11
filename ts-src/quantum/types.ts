@@ -1,5 +1,6 @@
 import { Uint8ArrayOrBuffer } from '../Buffer.js';
 import { MLDSASecurityLevel } from './config.js';
+import { Network } from '../types.js';
 
 /**
  * ML-DSA key pair interface
@@ -51,6 +52,7 @@ export interface QuantumSigner {
  */
 export interface QuantumBIP32Interface extends QuantumSigner {
   chainCode: Uint8ArrayOrBuffer;
+  network: Network;
   depth: number;
   index: number;
   parentFingerprint: number;
@@ -98,18 +100,20 @@ export interface QuantumBIP32Interface extends QuantumSigner {
 export interface QuantumBIP32API {
   /**
    * Create a quantum master key from a seed
-   * Uses ML-DSA for key generation (default: ML-DSA-44)
+   * Uses ML-DSA for key generation (default: ML-DSA-44 on mainnet)
    * @param seed - Seed bytes (16-64 bytes)
-   * @param securityLevel - ML-DSA security level (44, 65, or 87)
+   * @param network - Network configuration (defaults to quantum mainnet)
+   * @param securityLevel - ML-DSA security level (44, 65, or 87) - defaults to 44
    */
   fromSeed(
     seed: Uint8ArrayOrBuffer,
+    network?: Network,
     securityLevel?: MLDSASecurityLevel,
   ): QuantumBIP32Interface;
 
   /**
    * Import a quantum key from base58
-   * Security level is detected from the version bytes
+   * Security level and network are detected from the version bytes
    * @param inString - Base58-encoded extended key
    */
   fromBase58(inString: string): QuantumBIP32Interface;
@@ -118,11 +122,13 @@ export interface QuantumBIP32API {
    * Create quantum key from public key and chain code
    * @param publicKey - ML-DSA public key (size depends on security level)
    * @param chainCode - Chain code (32 bytes)
-   * @param securityLevel - ML-DSA security level (44, 65, or 87)
+   * @param network - Network configuration (defaults to quantum mainnet)
+   * @param securityLevel - ML-DSA security level (44, 65, or 87) - required if not using default
    */
   fromPublicKey(
     publicKey: Uint8ArrayOrBuffer,
     chainCode: Uint8ArrayOrBuffer,
+    network?: Network,
     securityLevel?: MLDSASecurityLevel,
   ): QuantumBIP32Interface;
 
@@ -130,11 +136,13 @@ export interface QuantumBIP32API {
    * Create quantum key from private key and chain code
    * @param privateKey - ML-DSA private key (size depends on security level)
    * @param chainCode - Chain code (32 bytes)
-   * @param securityLevel - ML-DSA security level (44, 65, or 87)
+   * @param network - Network configuration (defaults to quantum mainnet)
+   * @param securityLevel - ML-DSA security level (44, 65, or 87) - required if not using default
    */
   fromPrivateKey(
     privateKey: Uint8ArrayOrBuffer,
     chainCode: Uint8ArrayOrBuffer,
+    network?: Network,
     securityLevel?: MLDSASecurityLevel,
   ): QuantumBIP32Interface;
 }

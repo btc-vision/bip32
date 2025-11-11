@@ -28,12 +28,15 @@ This maintains the critical property that **the same mnemonic always generates t
 
 - ✅ **Quantum-Resistant**: ML-DSA provides post-quantum security
 - ✅ **Multiple Security Levels**: Choose between LEVEL2 (44), LEVEL3 (65), or LEVEL5 (87)
+- ✅ **Network Support**: Works with any Bitcoin network (mainnet, testnet, regtest, Litecoin, Dogecoin, custom networks)
+- ✅ **Standard Version Bytes**: Uses each network's standard BIP32 version bytes - quantum keys distinguished by size, not version
 - ✅ **Type-Safe Enums**: Use `MLDSASecurityLevel` enum for security levels
 - ✅ **Standard Derivation Paths**: Use `QuantumDerivationPath` enum for paths
 - ✅ **BIP-32 Compatible**: Uses standard BIP-32 hierarchical derivation paths
 - ✅ **Deterministic**: Same seed always produces same keys
 - ✅ **Audited Library**: Built on [@btc-vision/post-quantum](https://www.npmjs.com/package/@btc-vision/post-quantum)
 - ✅ **Full API**: keygen, sign, verify, derive, export/import
+- ✅ **142 Tests**: Comprehensive test coverage including network support
 
 ## Installation
 
@@ -50,20 +53,22 @@ import {
   QuantumBIP32Factory,
   MLDSASecurityLevel,
   QuantumDerivationPath,
+  BITCOIN,
+  TESTNET,
+  Network,
 } from '@btc-vision/bip32';
 import { randomBytes } from 'crypto';
 
 // 1. Create master key from seed (use BIP39 mnemonic in production)
 const seed = randomBytes(32);
 
-// Default: ML-DSA-44 (LEVEL2)
+// Default: ML-DSA-44 (LEVEL2) on mainnet
 const master = QuantumBIP32Factory.fromSeed(seed);
 
-// Or specify security level explicitly
-const masterHighSec = QuantumBIP32Factory.fromSeed(
-  seed,
-  MLDSASecurityLevel.LEVEL5
-);
+// Or specify network and/or security level
+const testnetKey = QuantumBIP32Factory.fromSeed(seed, TESTNET);
+const mainnetHighSec = QuantumBIP32Factory.fromSeed(seed, BITCOIN, MLDSASecurityLevel.LEVEL5);
+const testnetLevel3 = QuantumBIP32Factory.fromSeed(seed, TESTNET, MLDSASecurityLevel.LEVEL3);
 
 // 2. Derive child key using standard path enum
 const child = master.derivePath(QuantumDerivationPath.STANDARD);
@@ -92,15 +97,63 @@ const key = master.derivePath(QuantumDerivationPath.STANDARD);
 const customKey = master.derivePath("m/360'/0'/0'/0/0");
 ```
 
+### Network Support
+
+Quantum keys work with **any Bitcoin-compatible network** using standard BIP32 version bytes:
+
+```typescript
+import { BITCOIN, TESTNET, REGTEST, Network } from '@btc-vision/bip32';
+
+// Mainnet (default)
+const mainnet = QuantumBIP32Factory.fromSeed(seed, BITCOIN);
+console.log(mainnet.network.bech32); // 'bc'
+
+// Testnet
+const testnet = QuantumBIP32Factory.fromSeed(seed, TESTNET);
+console.log(testnet.network.bech32); // 'tb'
+
+// Regtest
+const regtest = QuantumBIP32Factory.fromSeed(seed, REGTEST);
+console.log(regtest.network.bech32); // 'bcrt'
+
+// Custom network (e.g., Litecoin)
+const LITECOIN: Network = {
+  messagePrefix: '\x19Litecoin Signed Message:\n',
+  bech32: 'ltc',
+  bip32: {
+    public: 0x019da462,
+    private: 0x019d9cfe,
+  },
+  pubKeyHash: 0x30,
+  scriptHash: 0x32,
+  wif: 0xb0,
+};
+
+const ltcKey = QuantumBIP32Factory.fromSeed(seed, LITECOIN);
+console.log(ltcKey.network.bech32); // 'ltc'
+
+// Network is preserved through derivation
+const child = ltcKey.derivePath(QuantumDerivationPath.STANDARD);
+console.log(child.network.bech32); // Still 'ltc'
+```
+
+**Key Points:**
+- Quantum keys use the **network's standard BIP32 version bytes** (e.g., `xprv`/`xpub` for Bitcoin mainnet)
+- Security level is detected from the **key size** when importing
+- Network is **preserved** through child key derivation
+- Works with **any network** that follows the BIP32 `Network` interface
+
 ### Export/Import Keys
 
 ```typescript
-// Export to base58
+// Export to base58 (uses network's version bytes)
 const exported = child.toBase58();
-console.log('Exported:', exported); // ~6753 chars
+console.log('Exported:', exported); // ~3563-6804 chars depending on security level
 
-// Import from base58
+// Import from base58 (network and security level auto-detected)
 const imported = QuantumBIP32Factory.fromBase58(exported);
+console.log('Network:', imported.network.bech32); // Preserved
+console.log('Security:', imported.securityLevel); // Auto-detected from key size
 
 // Verify it works
 const sig = imported.sign(message);
@@ -131,13 +184,26 @@ Factory for creating quantum-resistant BIP32 keys.
 
 #### Methods
 
-##### `fromSeed(seed: Uint8Array): QuantumBIP32Interface`
+##### `fromSeed(seed: Uint8Array, network?: Network, securityLevel?: MLDSASecurityLevel): QuantumBIP32Interface`
 
 Create master key from seed (16-64 bytes).
 
+**Parameters:**
+- `seed`: Seed bytes (16-64 bytes, typically 32 from BIP39)
+- `network`: Optional network (defaults to Bitcoin mainnet)
+- `securityLevel`: Optional security level (defaults to LEVEL2/ML-DSA-44)
+
 ```typescript
 const seed = randomBytes(32);
+
+// Default: mainnet, LEVEL2
 const master = QuantumBIP32Factory.fromSeed(seed);
+
+// Specify network
+const testnet = QuantumBIP32Factory.fromSeed(seed, TESTNET);
+
+// Specify both network and security level
+const secure = QuantumBIP32Factory.fromSeed(seed, BITCOIN, MLDSASecurityLevel.LEVEL5);
 ```
 
 ##### `fromBase58(encoded: string): QuantumBIP32Interface`

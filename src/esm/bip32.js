@@ -6,6 +6,7 @@ import * as v from 'valibot';
 import { Bip32PathSchema, Buffer256Bit, Buffer33Bytes, NetworkSchema, Uint31Schema, Uint32Schema, } from './types.js';
 import * as wif from 'wif';
 import * as tools from 'uint8array-tools';
+import { BITCOIN } from './networks.js';
 const _bs58check = base58check(sha256);
 const bs58check = {
     encode: (data) => _bs58check.encode(data),
@@ -13,17 +14,6 @@ const bs58check = {
 };
 export function BIP32Factory(ecc) {
     testEcc(ecc);
-    const BITCOIN = {
-        messagePrefix: '\x18Bitcoin Signed Message:\n',
-        bech32: 'bc',
-        bip32: {
-            public: 0x0488b21e,
-            private: 0x0488ade4,
-        },
-        pubKeyHash: 0x00,
-        scriptHash: 0x05,
-        wif: 0x80,
-    };
     const HIGHEST_BIT = 0x80000000;
     function toXOnly(pubKey) {
         return pubKey.length === 32 ? pubKey : pubKey.slice(1, 33);

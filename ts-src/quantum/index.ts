@@ -52,9 +52,8 @@ export {
 export {
   MLDSASecurityLevel,
   MLDSAConfig,
-  MLDSA_CONFIGS,
   DEFAULT_SECURITY_LEVEL,
-  getMLDSAConfig
+  getMLDSAConfig,
 } from './config.js';
 
 // Re-export derivation path enums for convenience

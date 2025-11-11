@@ -53,10 +53,12 @@ This library now supports **quantum-resistant hierarchical deterministic key der
 
 - **Full BIP-32 Compatibility**: Uses standard hierarchical derivation paths (e.g., `m/360'/0'/0'/0/0`)
 - **Multiple Security Levels**: Choose between LEVEL2, LEVEL3, or LEVEL5 based on your needs
+- **Network Support**: Works with any Bitcoin network (mainnet, testnet, regtest, or custom networks like Litecoin)
+- **Standard Version Bytes**: Uses each network's standard BIP32 version bytes - no custom quantum versions needed
 - **Type-Safe API**: Use `MLDSASecurityLevel` enum for security levels
 - **Deterministic**: Same seed always generates the same quantum keys
 - **Future-Proof**: Meets post-2030 and post-2035 security requirements
-- **Production-Ready**: Comprehensive test coverage
+- **Production-Ready**: Comprehensive test coverage (142 tests)
 - **Built on Standards**: Uses `@btc-vision/post-quantum` for ML-DSA implementation
 
 ### Important Note: Key Derivation Differences
@@ -110,18 +112,21 @@ const child = node.derivePath('m/0/0');
 import {
   QuantumBIP32Factory,
   MLDSASecurityLevel,
-  QuantumDerivationPath
+  QuantumDerivationPath,
+  BITCOIN,
+  TESTNET
 } from '@btc-vision/bip32';
 
 // No ECC library needed - ML-DSA is built-in
 const seed = Buffer.from('your-seed-here', 'hex');
 
-// Create master quantum key (default: ML-DSA-44 / LEVEL2)
+// Create master quantum key (default: ML-DSA-44 / LEVEL2 on mainnet)
 const master = QuantumBIP32Factory.fromSeed(seed);
 
-// Or specify security level explicitly
-const masterLevel5 = QuantumBIP32Factory.fromSeed(seed, MLDSASecurityLevel.LEVEL5);
-const masterLevel3 = QuantumBIP32Factory.fromSeed(seed, MLDSASecurityLevel.LEVEL3);
+// Or specify network and security level
+const testnetKey = QuantumBIP32Factory.fromSeed(seed, TESTNET);
+const masterLevel5 = QuantumBIP32Factory.fromSeed(seed, BITCOIN, MLDSASecurityLevel.LEVEL5);
+const testnetLevel3 = QuantumBIP32Factory.fromSeed(seed, TESTNET, MLDSASecurityLevel.LEVEL3);
 
 // Derive child using standard BIP-360 path
 const child = master.derivePath(QuantumDerivationPath.STANDARD);
@@ -134,11 +139,14 @@ const signature = child.sign(txHash);
 const isValid = child.verify(txHash, signature);
 console.log('Signature valid:', isValid);
 
-// Export for backup
+// Export for backup (uses network's standard BIP32 version bytes)
 const exported = child.toBase58();
 
-// Import from backup (security level auto-detected)
+// Import from backup (network and security level auto-detected from version bytes and key size)
 const imported = QuantumBIP32Factory.fromBase58(exported);
+
+// Network is preserved
+console.log('Network:', imported.network.bech32); // 'bc' for mainnet, 'tb' for testnet
 ```
 
 ### NodeJS (CommonJS)
@@ -147,16 +155,19 @@ const imported = QuantumBIP32Factory.fromBase58(exported);
 const {
   QuantumBIP32Factory,
   MLDSASecurityLevel,
-  QuantumDerivationPath
+  QuantumDerivationPath,
+  BITCOIN,
+  TESTNET
 } = require('@btc-vision/bip32');
 
 const seed = Buffer.from('your-seed-here', 'hex');
 
-// Default: ML-DSA-44 (LEVEL2)
+// Default: ML-DSA-44 (LEVEL2) on mainnet
 const master = QuantumBIP32Factory.fromSeed(seed);
 
-// Or specify security level
-const masterLevel5 = QuantumBIP32Factory.fromSeed(seed, MLDSASecurityLevel.LEVEL5);
+// Or specify network and security level
+const testnetKey = QuantumBIP32Factory.fromSeed(seed, TESTNET);
+const masterLevel5 = QuantumBIP32Factory.fromSeed(seed, BITCOIN, MLDSASecurityLevel.LEVEL5);
 
 const child = master.derivePath(QuantumDerivationPath.STANDARD);
 

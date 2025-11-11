@@ -40,11 +40,17 @@ exports.Uint31Schema = v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue
 const Uint8Schema = v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(0xff));
 exports.Buffer256Bit = v.pipe(v.instance(Uint8Array), v.length(32));
 exports.Buffer33Bytes = v.pipe(v.instance(Uint8Array), v.length(33));
+const Bip32Schema = v.object({
+    public: exports.Uint32Schema,
+    private: exports.Uint32Schema,
+});
 exports.NetworkSchema = v.object({
     wif: Uint8Schema,
-    bip32: v.object({
-        public: exports.Uint32Schema,
-        private: exports.Uint32Schema,
-    }),
+    bip32: Bip32Schema,
+    messagePrefix: v.string(),
+    bech32: v.string(),
+    bech32Opnet: v.optional(v.string()),
+    pubKeyHash: Uint8Schema,
+    scriptHash: Uint8Schema,
 });
 exports.Bip32PathSchema = v.pipe(v.string(), v.regex(/^(m\/)?(\d+'?\/)*\d+'?$/));

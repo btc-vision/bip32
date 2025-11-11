@@ -78,3 +78,15 @@ export function getBitcoinPath(
   const changeIndex = isChange ? 1 : 0;
   return `m/${bipType}'/0'/${account}'/${changeIndex}/${addressIndex}`;
 }
+
+/**
+ * Type representing valid derivation paths for standard BIP32
+ * Can be an enum value or any custom BIP32 path string
+ */
+export type DerivationPathType = DerivationPath | string;
+
+/**
+ * Type representing valid derivation paths for quantum BIP32
+ * Can be an enum value or any custom BIP32 path string
+ */
+export type QuantumDerivationPathType = QuantumDerivationPath | string;

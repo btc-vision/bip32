@@ -2,10 +2,11 @@ import { randomBytes } from '@btc-vision/post-quantum/utils.js';
 import * as crypto from '../crypto.js';
 import * as tools from 'uint8array-tools';
 import * as v from 'valibot';
-import { Uint32Schema, Uint31Schema, Bip32PathSchema } from '../types.js';
+import { Uint32Schema, Uint31Schema, Bip32PathSchema, } from '../types.js';
 import { base58check } from '@scure/base';
 import { sha256 } from '@noble/hashes/sha256';
-import { getMLDSAConfig, DEFAULT_SECURITY_LEVEL, } from './config.js';
+import { MLDSASecurityLevel, getMLDSAConfig, findNetworkByVersion, } from './config.js';
+import { BITCOIN as DEFAULT_NETWORK } from '../networks.js';
 const _bs58check = base58check(sha256);
 const bs58check = {
     encode: (data) => _bs58check.encode(data),
@@ -82,6 +83,9 @@ class QuantumBIP32 extends QuantumBip32Signer {
     get securityLevel() {
         return this.config.level;
     }
+    get network() {
+        return this.config.network;
+    }
     isNeutered() {
         return this._privateKey === undefined;
     }
@@ -90,8 +94,8 @@ class QuantumBIP32 extends QuantumBip32Signer {
     }
     toBase58() {
         const version = !this.isNeutered()
-            ? this.config.version.private
-            : this.config.version.public;
+            ? this.config.network.bip32.private
+            : this.config.network.bip32.public;
         const isPrivate = !this.isNeutered();
         const keySize = isPrivate
             ? this.config.privateKeySize
@@ -203,8 +207,9 @@ class QuantumBIP32 extends QuantumBip32Signer {
 }
 /**
  * Create a quantum BIP32 master key from a seed
+ * Follows standard BIP32 pattern: fromSeed(seed, network?, securityLevel?)
  */
-function fromSeed(seed, securityLevel = DEFAULT_SECURITY_LEVEL) {
+function fromSeed(seed, network, securityLevel) {
     v.parse(v.instance(Uint8Array), seed);
     if (seed.length < 16) {
         throw new TypeError('Seed should be at least 128 bits');
@@ -212,7 +217,7 @@ function fromSeed(seed, securityLevel = DEFAULT_SECURITY_LEVEL) {
     if (seed.length > 64) {
         throw new TypeError('Seed should be at most 512 bits');
     }
-    const config = getMLDSAConfig(securityLevel);
+    const config = getMLDSAConfig(securityLevel || MLDSASecurityLevel.LEVEL2, network || DEFAULT_NETWORK);
     // Use BIP32 standard HMAC for initial seed derivation
     const I = crypto.hmacSHA512(tools.fromUtf8('Bitcoin seed'), seed);
     const IL = I.slice(0, 32);
@@ -226,24 +231,55 @@ function fromSeed(seed, securityLevel = DEFAULT_SECURITY_LEVEL) {
 }
 /**
  * Import a quantum key from base58
+ * Network is detected from version bytes, security level from key size
  */
 function fromBase58(inString) {
     const buffer = bs58check.decode(inString);
-    // Read version to determine security level
+    // Read version to determine network
     const version = tools.readUInt32(buffer, 0, 'BE');
-    // Find matching config by version
-    let config;
-    for (const level of [44, 65, 87]) {
-        const c = getMLDSAConfig(level);
-        if (version === c.version.private || version === c.version.public) {
-            config = c;
-            break;
+    // Find matching network by version
+    const match = findNetworkByVersion(version);
+    if (!match) {
+        throw new TypeError('Unknown network version');
+    }
+    const { network, isPrivate } = match;
+    // Determine security level from buffer size
+    // Buffer structure: 4 (version) + 1 (depth) + 4 (parent fp) + 4 (index) + 32 (chain code) + key data
+    const headerSize = 4 + 1 + 4 + 4 + 32;
+    const keyDataSize = buffer.length - headerSize;
+    // Map key sizes to security levels
+    let securityLevel;
+    if (isPrivate) {
+        // Private key sizes: 2560 (44), 4032 (65), 4896 (87)
+        if (keyDataSize === 2560) {
+            securityLevel = MLDSASecurityLevel.LEVEL2;
+        }
+        else if (keyDataSize === 4032) {
+            securityLevel = MLDSASecurityLevel.LEVEL3;
+        }
+        else if (keyDataSize === 4896) {
+            securityLevel = MLDSASecurityLevel.LEVEL5;
+        }
+        else {
+            throw new TypeError(`Invalid private key size: ${keyDataSize}`);
         }
     }
-    if (!config) {
-        throw new TypeError('Invalid quantum BIP32 version');
+    else {
+        // Public key sizes: 1312 (44), 1952 (65), 2592 (87)
+        if (keyDataSize === 1312) {
+            securityLevel = MLDSASecurityLevel.LEVEL2;
+        }
+        else if (keyDataSize === 1952) {
+            securityLevel = MLDSASecurityLevel.LEVEL3;
+        }
+        else if (keyDataSize === 2592) {
+            securityLevel = MLDSASecurityLevel.LEVEL5;
+        }
+        else {
+            throw new TypeError(`Invalid public key size: ${keyDataSize}`);
+        }
     }
-    const isPrivate = version === config.version.private;
+    const config = getMLDSAConfig(securityLevel, network);
     const expectedSize = isPrivate
         ? 4 + 1 + 4 + 4 + 32 + config.privateKeySize
         : 4 + 1 + 4 + 4 + 32 + config.publicKeySize;
@@ -282,9 +318,10 @@ function fromBase58(inString) {
 }
 /**
  * Create quantum key from public key and chain code
+ * Follows standard BIP32 pattern: fromPublicKey(publicKey, chainCode, network?, securityLevel?)
  */
-function fromPublicKey(publicKey, chainCode, securityLevel = DEFAULT_SECURITY_LEVEL) {
-    const config = getMLDSAConfig(securityLevel);
+function fromPublicKey(publicKey, chainCode, network, securityLevel) {
+    const config = getMLDSAConfig(securityLevel || MLDSASecurityLevel.LEVEL2, network || DEFAULT_NETWORK);
     if (publicKey.length !== config.publicKeySize) {
         throw new TypeError(`Invalid public key length for ML-DSA-${securityLevel}: expected ${config.publicKeySize}, got ${publicKey.length}`);
     }
@@ -295,9 +332,10 @@ function fromPublicKey(publicKey, chainCode, securityLevel = DEFAULT_SECURITY_LE
 }
 /**
  * Create quantum key from private key and chain code
+ * Follows standard BIP32 pattern: fromPrivateKey(privateKey, chainCode, network?, securityLevel?)
  */
-function fromPrivateKey(privateKey, chainCode, securityLevel = DEFAULT_SECURITY_LEVEL) {
-    const config = getMLDSAConfig(securityLevel);
+function fromPrivateKey(privateKey, chainCode, network, securityLevel) {
+    const config = getMLDSAConfig(securityLevel || MLDSASecurityLevel.LEVEL2, network || DEFAULT_NETWORK);
     if (privateKey.length !== config.privateKeySize) {
         throw new TypeError(`Invalid private key length for ML-DSA-${securityLevel}: expected ${config.privateKeySize}, got ${privateKey.length}`);
     }

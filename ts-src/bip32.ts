@@ -14,6 +14,7 @@ import {
 import * as wif from 'wif';
 import * as tools from 'uint8array-tools';
 import { Uint8ArrayOrBuffer } from './Buffer.js';
+import { BITCOIN } from './networks.js';
 const _bs58check = base58check(sha256);
 const bs58check = {
   encode: (data: Uint8ArrayOrBuffer): string => _bs58check.encode(data),
@@ -127,18 +128,6 @@ export interface TinySecp256k1Interface {
 
 export function BIP32Factory(ecc: TinySecp256k1Interface): BIP32API {
   testEcc(ecc);
-
-  const BITCOIN: Network = {
-    messagePrefix: '\x18Bitcoin Signed Message:\n',
-    bech32: 'bc',
-    bip32: {
-      public: 0x0488b21e,
-      private: 0x0488ade4,
-    },
-    pubKeyHash: 0x00,
-    scriptHash: 0x05,
-    wif: 0x80,
-  };
 
   const HIGHEST_BIT = 0x80000000;
 

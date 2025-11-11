@@ -1,4 +1,5 @@
 import { ml_dsa44, ml_dsa65, ml_dsa87, } from '@btc-vision/post-quantum/ml-dsa.js';
+import { BITCOIN, TESTNET, REGTEST } from '../networks.js';
 /**
  * ML-DSA security levels
  *
@@ -17,19 +18,15 @@ export var MLDSASecurityLevel;
     MLDSASecurityLevel[MLDSASecurityLevel["LEVEL5"] = 87] = "LEVEL5";
 })(MLDSASecurityLevel || (MLDSASecurityLevel = {}));
 /**
- * ML-DSA configurations for each security level
+ * Base configurations for each security level (network-agnostic)
  */
-export const MLDSA_CONFIGS = {
+const BASE_CONFIGS = {
     [MLDSASecurityLevel.LEVEL2]: {
         level: MLDSASecurityLevel.LEVEL2,
         privateKeySize: 2560,
         publicKeySize: 1312,
         signatureSize: 2420,
         algorithm: ml_dsa44,
-        version: {
-            public: 0x04889b20,
-            private: 0x04889add,
-        },
     },
     [MLDSASecurityLevel.LEVEL3]: {
         level: MLDSASecurityLevel.LEVEL3,
@@ -37,10 +34,6 @@ export const MLDSA_CONFIGS = {
         publicKeySize: 1952,
         signatureSize: 3309,
         algorithm: ml_dsa65,
-        version: {
-            public: 0x04889b21,
-            private: 0x04889ade,
-        },
     },
     [MLDSASecurityLevel.LEVEL5]: {
         level: MLDSASecurityLevel.LEVEL5,
@@ -48,10 +41,6 @@ export const MLDSA_CONFIGS = {
         publicKeySize: 2592,
         signatureSize: 4627,
         algorithm: ml_dsa87,
-        version: {
-            public: 0x04889b22,
-            private: 0x04889adf,
-        },
     },
 };
 /**
@@ -59,12 +48,36 @@ export const MLDSA_CONFIGS = {
  */
 export const DEFAULT_SECURITY_LEVEL = MLDSASecurityLevel.LEVEL2;
 /**
- * Get ML-DSA configuration for a specific security level
+ * Get ML-DSA configuration for a specific security level and network
+ * @param level - Security level (44, 65, or 87)
+ * @param network - Network configuration
  */
-export function getMLDSAConfig(level = DEFAULT_SECURITY_LEVEL) {
-    const config = MLDSA_CONFIGS[level];
-    if (!config) {
+export function getMLDSAConfig(level, network) {
+    const baseConfig = BASE_CONFIGS[level];
+    if (!baseConfig) {
         throw new TypeError(`Invalid ML-DSA security level: ${level}. Must be MLDSASecurityLevel.LEVEL2 (44), LEVEL3 (65), or LEVEL5 (87)`);
     }
-    return config;
+    return {
+        ...baseConfig,
+        network,
+    };
+}
+/**
+ * Find matching network and determine if private/public by version bytes
+ * Used when importing from base58
+ */
+export function findNetworkByVersion(version) {
+    // Try common networks first
+    const commonNetworks = [BITCOIN, TESTNET, REGTEST];
+    for (const network of commonNetworks) {
+        if (version === network.bip32.private) {
+            return { network, isPrivate: true };
+        }
+        if (version === network.bip32.public) {
+            return { network, isPrivate: false };
+        }
+    }
+    // For unknown networks, we can't determine which network it is
+    // The caller will need to have the network object or fail
+    return null;
 }

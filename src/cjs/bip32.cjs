@@ -42,6 +42,7 @@ const v = __importStar(require("valibot"));
 const types_js_1 = require("./types.cjs");
 const wif = __importStar(require("wif"));
 const tools = __importStar(require("uint8array-tools"));
+const networks_js_1 = require("./networks.cjs");
 const _bs58check = (0, base_1.base58check)(sha256_1.sha256);
 const bs58check = {
     encode: (data) => _bs58check.encode(data),
@@ -49,17 +50,6 @@ const bs58check = {
 };
 function BIP32Factory(ecc) {
     (0, testecc_js_1.testEcc)(ecc);
-    const BITCOIN = {
-        messagePrefix: '\x18Bitcoin Signed Message:\n',
-        bech32: 'bc',
-        bip32: {
-            public: 0x0488b21e,
-            private: 0x0488ade4,
-        },
-        pubKeyHash: 0x00,
-        scriptHash: 0x05,
-        wif: 0x80,
-    };
     const HIGHEST_BIT = 0x80000000;
     function toXOnly(pubKey) {
         return pubKey.length === 32 ? pubKey : pubKey.slice(1, 33);
@@ -315,7 +305,7 @@ function BIP32Factory(ecc) {
         const buffer = bs58check.decode(inString);
         if (buffer.length !== 78)
             throw new TypeError('Invalid buffer length');
-        network = network || BITCOIN;
+        network = network || networks_js_1.BITCOIN;
         // 4 bytes: version bytes
         const version = tools.readUInt32(buffer, 0, 'BE');
         if (version !== network.bip32.private && version !== network.bip32.public)
@@ -356,7 +346,7 @@ function BIP32Factory(ecc) {
     function fromPrivateKeyLocal(privateKey, chainCode, network, depth, index, parentFingerprint) {
         v.parse(types_js_1.Buffer256Bit, privateKey);
         v.parse(types_js_1.Buffer256Bit, chainCode);
-        network = network || BITCOIN;
+        network = network || networks_js_1.BITCOIN;
         if (!ecc.isPrivate(privateKey))
             throw new TypeError('Private key not in range [1, n)');
         return new BIP32(privateKey, undefined, chainCode, network, depth, index, parentFingerprint);
@@ -367,7 +357,7 @@ function BIP32Factory(ecc) {
     function fromPublicKeyLocal(publicKey, chainCode, network, depth, index, parentFingerprint) {
         v.parse(types_js_1.Buffer33Bytes, publicKey);
         v.parse(types_js_1.Buffer256Bit, chainCode);
-        network = network || BITCOIN;
+        network = network || networks_js_1.BITCOIN;
         // verify the X coordinate is a point on the curve
         if (!ecc.isPoint(publicKey))
             throw new TypeError('Point is not on the curve');
@@ -379,7 +369,7 @@ function BIP32Factory(ecc) {
             throw new TypeError('Seed should be at least 128 bits');
         if (seed.length > 64)
             throw new TypeError('Seed should be at most 512 bits');
-        network = network || BITCOIN;
+        network = network || networks_js_1.BITCOIN;
         const I = crypto.hmacSHA512(tools.fromUtf8('Bitcoin seed'), seed);
         const IL = I.slice(0, 32);
         const IR = I.slice(32);

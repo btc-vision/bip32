@@ -6,6 +6,10 @@ import * as ecc from "tiny-secp256k1";
 import * as tools from "uint8array-tools";
 const BIP32 = BIP32Creator(ecc)
 let LITECOIN = {
+  messagePrefix: '\x19Litecoin Signed Message:\n',
+  bech32: 'ltc',
+  pubKeyHash: 0x30,
+  scriptHash: 0x32,
   wif: 0xb0,
   bip32: {
     public: 0x019da462,
