@@ -488,6 +488,51 @@ function fromPrivateKey(
 }
 
 /**
+ * Create quantum key from private key, public key, and chain code.
+ * This avoids the expensive getPublicKey() derivation when the public key is already known.
+ * Use this for faster imports when both keys are available (e.g., from backup/export).
+ *
+ * IMPORTANT: This function does NOT verify that the public key matches the private key.
+ * The caller is responsible for ensuring the keys are a valid pair.
+ *
+ * @param privateKey - ML-DSA private key
+ * @param publicKey - ML-DSA public key (must correspond to the private key)
+ * @param chainCode - Chain code (32 bytes)
+ * @param network - Network configuration
+ * @param securityLevel - ML-DSA security level
+ */
+function fromKeyPair(
+  privateKey: Uint8ArrayOrBuffer,
+  publicKey: Uint8ArrayOrBuffer,
+  chainCode: Uint8ArrayOrBuffer,
+  network?: Network,
+  securityLevel?: MLDSASecurityLevel,
+): QuantumBIP32Interface {
+  const config = getMLDSAConfig(
+    securityLevel || MLDSASecurityLevel.LEVEL2,
+    network || DEFAULT_NETWORK,
+  );
+
+  if (privateKey.length !== config.privateKeySize) {
+    throw new TypeError(
+      `Invalid private key length for ML-DSA-${securityLevel}: expected ${config.privateKeySize}, got ${privateKey.length}`,
+    );
+  }
+  if (publicKey.length !== config.publicKeySize) {
+    throw new TypeError(
+      `Invalid public key length for ML-DSA-${securityLevel}: expected ${config.publicKeySize}, got ${publicKey.length}`,
+    );
+  }
+  if (chainCode.length !== CHAIN_CODE_SIZE) {
+    throw new TypeError(
+      `Invalid chain code length: expected ${CHAIN_CODE_SIZE}, got ${chainCode.length}`,
+    );
+  }
+
+  return new QuantumBIP32(privateKey, publicKey, chainCode, config, 0, 0, 0);
+}
+
+/**
  * Quantum BIP32 Factory
  * Provides API for creating and managing ML-DSA hierarchical deterministic keys
  * Supports ML-DSA-44 (default), ML-DSA-65, and ML-DSA-87
@@ -497,4 +542,5 @@ export const QuantumBIP32Factory: QuantumBIP32API = {
   fromBase58,
   fromPublicKey,
   fromPrivateKey,
+  fromKeyPair,
 };

@@ -115,4 +115,15 @@ export interface QuantumBIP32API {
      * @param securityLevel - ML-DSA security level (44, 65, or 87) - required if not using default
      */
     fromPrivateKey(privateKey: Uint8ArrayOrBuffer, chainCode: Uint8ArrayOrBuffer, network?: Network, securityLevel?: MLDSASecurityLevel): QuantumBIP32Interface;
+    /**
+     * Create quantum key from private key, public key, and chain code.
+     * This avoids the expensive getPublicKey() derivation when the public key is already known.
+     * Use this for faster imports when both keys are available (e.g., from backup/export).
+     * @param privateKey - ML-DSA private key (size depends on security level)
+     * @param publicKey - ML-DSA public key (size depends on security level)
+     * @param chainCode - Chain code (32 bytes)
+     * @param network - Network configuration (defaults to quantum mainnet)
+     * @param securityLevel - ML-DSA security level (44, 65, or 87) - required if not using default
+     */
+    fromKeyPair(privateKey: Uint8ArrayOrBuffer, publicKey: Uint8ArrayOrBuffer, chainCode: Uint8ArrayOrBuffer, network?: Network, securityLevel?: MLDSASecurityLevel): QuantumBIP32Interface;
 }
