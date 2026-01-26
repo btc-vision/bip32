@@ -1,6 +1,6 @@
 {
   "name": "@btc-vision/bip32",
-  "version": "6.0.4",
+  "version": "6.1.0",
   "type": "module",
   "description": "A BIP32 compatible library",
   "keywords": [
