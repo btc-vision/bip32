@@ -9,7 +9,7 @@ import {
 import tape from 'tape';
 import * as tools from 'uint8array-tools';
 import { base58check } from '@scure/base';
-import { sha256 } from '@noble/hashes/sha256';
+import { sha256 } from '@noble/hashes/sha2.js';
 
 const _bs58check = base58check(sha256);
 const bs58check = {

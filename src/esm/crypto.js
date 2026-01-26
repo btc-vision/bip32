@@ -1,7 +1,6 @@
-import { hmac } from '@noble/hashes/hmac';
-import { ripemd160 } from '@noble/hashes/ripemd160';
-import { sha256 } from '@noble/hashes/sha256';
-import { sha512 } from '@noble/hashes/sha512';
+import { hmac } from '@noble/hashes/hmac.js';
+import { ripemd160 } from '@noble/hashes/legacy.js';
+import { sha256, sha512 } from '@noble/hashes/sha2.js';
 export function hash160(buffer) {
     return ripemd160(sha256(buffer));
 }

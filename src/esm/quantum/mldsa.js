@@ -4,7 +4,7 @@ import * as tools from 'uint8array-tools';
 import * as v from 'valibot';
 import { Uint32Schema, Uint31Schema, Bip32PathSchema, } from '../types.js';
 import { base58check } from '@scure/base';
-import { sha256 } from '@noble/hashes/sha256';
+import { sha256 } from '@noble/hashes/sha2.js';
 import { MLDSASecurityLevel, getMLDSAConfig, findNetworkByVersion, } from './config.js';
 import { BITCOIN as DEFAULT_NETWORK } from '../networks.js';
 const _bs58check = base58check(sha256);
@@ -371,7 +371,6 @@ function fromKeyPair(privateKey, publicKey, chainCode, network, securityLevel) {
     if (chainCode.length !== CHAIN_CODE_SIZE) {
         throw new TypeError(`Invalid chain code length: expected ${CHAIN_CODE_SIZE}, got ${chainCode.length}`);
     }
-    // Skip the expensive getPublicKey() call - use the provided public key directly
     return new QuantumBIP32(privateKey, publicKey, chainCode, config, 0, 0, 0);
 }
 /**

@@ -1,7 +1,7 @@
 import * as crypto from './crypto.js';
 import { testEcc } from './testecc.js';
 import { base58check } from '@scure/base';
-import { sha256 } from '@noble/hashes/sha256';
+import { sha256 } from '@noble/hashes/sha2.js';
 import * as v from 'valibot';
 import { Bip32PathSchema, Buffer256Bit, Buffer33Bytes, NetworkSchema, Uint31Schema, Uint32Schema, } from './types.js';
 import * as wif from 'wif';
