@@ -34,7 +34,6 @@ This maintains the critical property that **the same mnemonic always generates t
 - ✅ **Standard Derivation Paths**: Use `QuantumDerivationPath` enum for paths
 - ✅ **BIP-32 Compatible**: Uses standard BIP-32 hierarchical derivation paths
 - ✅ **Deterministic**: Same seed always produces same keys
-- ✅ **Audited Library**: Built on [@btc-vision/post-quantum](https://www.npmjs.com/package/@btc-vision/post-quantum)
 - ✅ **Full API**: keygen, sign, verify, derive, export/import
 - ✅ **142 Tests**: Comprehensive test coverage including network support
 
