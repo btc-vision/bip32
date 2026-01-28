@@ -6,7 +6,7 @@ import {
   TESTNET,
   REGTEST,
 } from '../src/esm/index.js';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import * as tools from 'uint8array-tools';
 import { base58check } from '@scure/base';
 import { sha256 } from '@noble/hashes/sha2.js';
@@ -17,11 +17,31 @@ const bs58check = {
   decode: (str) => _bs58check.decode(str),
 };
 
+const SEED = tools.fromHex('000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f');
+
+// Shared fixtures — initialised once before any test runs
+let master;             // SEED, BITCOIN, LEVEL2 (all defaults)
+let masterB58;          // master.toBase58()
+let masterB58Bytes;     // bs58check.decode(masterB58)
+let masterNeuteredB58Bytes; // bs58check.decode(master.neutered().toBase58())
+let masterLevel3;       // SEED, BITCOIN, LEVEL3
+let masterLevel5;       // SEED, BITCOIN, LEVEL5
+let masterLevel5B58;    // masterLevel5.toBase58()
+let masterTestnet;      // SEED, TESTNET, LEVEL2
+
+beforeAll(() => {
+  master = QuantumBIP32Factory.fromSeed(SEED);
+  masterB58 = master.toBase58();
+  masterB58Bytes = bs58check.decode(masterB58);
+  masterNeuteredB58Bytes = bs58check.decode(master.neutered().toBase58());
+  masterLevel3 = QuantumBIP32Factory.fromSeed(SEED, undefined, MLDSASecurityLevel.LEVEL3);
+  masterLevel5 = QuantumBIP32Factory.fromSeed(SEED, undefined, MLDSASecurityLevel.LEVEL5);
+  masterLevel5B58 = masterLevel5.toBase58();
+  masterTestnet = QuantumBIP32Factory.fromSeed(SEED, TESTNET);
+});
+
 describe('QuantumBIP32Factory.fromSeed', () => {
   it('creates master key from valid seed', () => {
-    const seed = tools.fromHex('000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f');
-    const master = QuantumBIP32Factory.fromSeed(seed);
-
     expect(master.depth).toBe(0);
     expect(master.index).toBe(0);
     expect(master.parentFingerprint).toBe(0);
@@ -42,20 +62,15 @@ describe('QuantumBIP32Factory.fromSeed', () => {
   });
 
   it('produces deterministic keys from same seed', () => {
-    const seed = tools.fromHex('000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f');
-    const master1 = QuantumBIP32Factory.fromSeed(seed);
-    const master2 = QuantumBIP32Factory.fromSeed(seed);
+    const master2 = QuantumBIP32Factory.fromSeed(SEED);
 
-    expect(tools.toHex(master1.publicKey)).toBe(tools.toHex(master2.publicKey));
-    expect(tools.toHex(master1.privateKey)).toBe(tools.toHex(master2.privateKey));
-    expect(tools.toHex(master1.chainCode)).toBe(tools.toHex(master2.chainCode));
+    expect(tools.toHex(master.publicKey)).toBe(tools.toHex(master2.publicKey));
+    expect(tools.toHex(master.privateKey)).toBe(tools.toHex(master2.privateKey));
+    expect(tools.toHex(master.chainCode)).toBe(tools.toHex(master2.chainCode));
   });
 });
 
 describe('QuantumBIP32 derivation', () => {
-  const seed = tools.fromHex('000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f');
-  const master = QuantumBIP32Factory.fromSeed(seed);
-
   it('derive hardened child', () => {
     const child = master.deriveHardened(0);
 
@@ -126,9 +141,6 @@ describe('QuantumBIP32 derivation', () => {
 });
 
 describe('QuantumBIP32 neutered keys', () => {
-  const seed = tools.fromHex('000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f');
-  const master = QuantumBIP32Factory.fromSeed(seed);
-
   it('neutered removes private key', () => {
     const neutered = master.neutered();
 
@@ -174,9 +186,6 @@ describe('QuantumBIP32 neutered keys', () => {
 });
 
 describe('QuantumBIP32 signing and verification', () => {
-  const seed = tools.fromHex('000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f');
-  const master = QuantumBIP32Factory.fromSeed(seed);
-
   it('sign produces valid signature', () => {
     const message = new Uint8Array(32);
     message.fill(0x42);
@@ -228,12 +237,8 @@ describe('QuantumBIP32 signing and verification', () => {
 });
 
 describe('QuantumBIP32 base58 import/export', () => {
-  const seed = tools.fromHex('000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f');
-  const master = QuantumBIP32Factory.fromSeed(seed);
-
   it('export and import private key', () => {
-    const exported = master.toBase58();
-    const imported = QuantumBIP32Factory.fromBase58(exported);
+    const imported = QuantumBIP32Factory.fromBase58(masterB58);
 
     expect(tools.toHex(imported.publicKey)).toBe(tools.toHex(master.publicKey));
     expect(tools.toHex(imported.privateKey)).toBe(tools.toHex(master.privateKey));
@@ -254,8 +259,7 @@ describe('QuantumBIP32 base58 import/export', () => {
   });
 
   it('imported key can sign', () => {
-    const exported = master.toBase58();
-    const imported = QuantumBIP32Factory.fromBase58(exported);
+    const imported = QuantumBIP32Factory.fromBase58(masterB58);
     const message = new Uint8Array(32);
     message.fill(0x42);
 
@@ -269,13 +273,8 @@ describe('QuantumBIP32 base58 import/export', () => {
   });
 
   it('throws on invalid version', () => {
-    // Create a base58 string with invalid version bytes
-    const seed = tools.fromHex('000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f');
-    const key = QuantumBIP32Factory.fromSeed(seed);
-    const validB58 = key.toBase58();
-
     // Decode, corrupt version, re-encode
-    const decoded = bs58check.decode(validB58);
+    const decoded = Uint8Array.from(masterB58Bytes);
     decoded[0] = 0xFF; // Invalid version byte
     const corrupted = bs58check.encode(decoded);
 
@@ -283,33 +282,21 @@ describe('QuantumBIP32 base58 import/export', () => {
   });
 
   it('throws on invalid buffer length', () => {
-    // Create a base58 with wrong length
-    const seed = tools.fromHex('000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f');
-    const key = QuantumBIP32Factory.fromSeed(seed);
-    const validB58 = key.toBase58();
-
     // Decode, truncate, re-encode
-    const decoded = bs58check.decode(validB58);
-    const truncated = decoded.slice(0, 100);
+    const truncated = masterB58Bytes.slice(0, 100);
     const corrupted = bs58check.encode(truncated);
 
     expect(() => QuantumBIP32Factory.fromBase58(corrupted)).toThrow(/Invalid (buffer length|private key size|public key size)/);
   });
 
   it('throws on invalid private key size', () => {
-    // Test invalid private key sizes by creating buffer with wrong key size
-    const seed = tools.fromHex('000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f');
-    const key = QuantumBIP32Factory.fromSeed(seed, BITCOIN, MLDSASecurityLevel.LEVEL2);
-    const validB58 = key.toBase58();
-    const decoded = bs58check.decode(validB58);
-
     // Header size: 4 (version) + 1 (depth) + 4 (parent fp) + 4 (index) + 32 (chain code) = 45
     const headerSize = 45;
     const invalidKeySize = 1000; // Not a valid ML-DSA private key size
     const buffer = new Uint8Array(headerSize + invalidKeySize);
 
     // Copy header from valid key
-    buffer.set(decoded.slice(0, headerSize), 0);
+    buffer.set(masterB58Bytes.slice(0, headerSize), 0);
     // Fill rest with data
     for (let i = headerSize; i < buffer.length; i++) {
       buffer[i] = i % 256;
@@ -320,19 +307,13 @@ describe('QuantumBIP32 base58 import/export', () => {
   });
 
   it('throws on invalid public key size', () => {
-    // Test invalid public key sizes
-    const seed = tools.fromHex('000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f');
-    const key = QuantumBIP32Factory.fromSeed(seed, BITCOIN, MLDSASecurityLevel.LEVEL2).neutered();
-    const validB58 = key.toBase58();
-    const decoded = bs58check.decode(validB58);
-
     // Header size: 45 bytes
     const headerSize = 45;
     const invalidKeySize = 999; // Not a valid ML-DSA public key size
     const buffer = new Uint8Array(headerSize + invalidKeySize);
 
-    // Copy header from valid key
-    buffer.set(decoded.slice(0, headerSize), 0);
+    // Copy header from neutered key
+    buffer.set(masterNeuteredB58Bytes.slice(0, headerSize), 0);
     // Fill rest with data
     for (let i = headerSize; i < buffer.length; i++) {
       buffer[i] = i % 256;
@@ -343,12 +324,7 @@ describe('QuantumBIP32 base58 import/export', () => {
   });
 
   it('throws on invalid parent fingerprint for master', () => {
-    // Create a base58 with depth=0 but non-zero parent fingerprint
-    const seed = tools.fromHex('000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f');
-    const key = QuantumBIP32Factory.fromSeed(seed);
-    const validB58 = key.toBase58();
-
-    const decoded = bs58check.decode(validB58);
+    const decoded = Uint8Array.from(masterB58Bytes);
     // depth is at offset 4, set to 0
     decoded[4] = 0;
     // parent fingerprint is at offset 5-8, set to non-zero
@@ -363,12 +339,7 @@ describe('QuantumBIP32 base58 import/export', () => {
   });
 
   it('throws on invalid index for master', () => {
-    // Create a base58 with depth=0 but non-zero index
-    const seed = tools.fromHex('000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f');
-    const key = QuantumBIP32Factory.fromSeed(seed);
-    const validB58 = key.toBase58();
-
-    const decoded = bs58check.decode(validB58);
+    const decoded = Uint8Array.from(masterB58Bytes);
     // depth is at offset 4, set to 0
     decoded[4] = 0;
     // parent fingerprint at offset 5-8, keep at 0
@@ -399,9 +370,6 @@ describe('QuantumBIP32 base58 import/export', () => {
 });
 
 describe('QuantumBIP32Factory.fromPublicKey', () => {
-  const seed = tools.fromHex('000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f');
-  const master = QuantumBIP32Factory.fromSeed(seed);
-
   it('creates key from public key and chain code', () => {
     const key = QuantumBIP32Factory.fromPublicKey(master.publicKey, master.chainCode);
 
@@ -426,9 +394,6 @@ describe('QuantumBIP32Factory.fromPublicKey', () => {
 });
 
 describe('QuantumBIP32Factory.fromPrivateKey', () => {
-  const seed = tools.fromHex('000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f');
-  const master = QuantumBIP32Factory.fromSeed(seed);
-
   it('creates key from private key and chain code', () => {
     const key = QuantumBIP32Factory.fromPrivateKey(master.privateKey, master.chainCode);
 
@@ -453,9 +418,6 @@ describe('QuantumBIP32Factory.fromPrivateKey', () => {
 });
 
 describe('QuantumBIP32 identifier and fingerprint', () => {
-  const seed = tools.fromHex('000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f');
-  const master = QuantumBIP32Factory.fromSeed(seed);
-
   it('identifier is 20 bytes', () => {
     expect(master.identifier.length).toBe(20);
   });
@@ -484,33 +446,21 @@ describe('QuantumBIP32 identifier and fingerprint', () => {
 
 describe('QuantumBIP32 edge cases', () => {
   it('can derive index 0', () => {
-    const seed = tools.fromHex('000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f');
-    const master = QuantumBIP32Factory.fromSeed(seed);
     const child = master.derive(0);
-
     expect(child.index).toBe(0);
   });
 
   it('can derive max non-hardened index', () => {
-    const seed = tools.fromHex('000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f');
-    const master = QuantumBIP32Factory.fromSeed(seed);
     const child = master.derive(0x7fffffff);
-
     expect(child.index).toBe(0x7fffffff);
   });
 
   it('can derive max hardened index', () => {
-    const seed = tools.fromHex('000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f');
-    const master = QuantumBIP32Factory.fromSeed(seed);
     const child = master.derive(0xffffffff);
-
     expect(child.index).toBe(0xffffffff);
   });
 
   it('derivePath handles various formats', () => {
-    const seed = tools.fromHex('000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f');
-    const master = QuantumBIP32Factory.fromSeed(seed);
-
     expect(() => master.derivePath("m/0")).not.toThrow();
     expect(() => master.derivePath("m/0'")).not.toThrow();
     expect(() => master.derivePath("m/0'/1")).not.toThrow();
@@ -518,26 +468,19 @@ describe('QuantumBIP32 edge cases', () => {
   });
 
   it('very deep derivation path', () => {
-    const seed = tools.fromHex('000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f');
-    const master = QuantumBIP32Factory.fromSeed(seed);
     const deep = master.derivePath("m/0'/1'/2'/3'/4'/5'/6'/7'/8'/9'");
-
     expect(deep.depth).toBe(10);
   });
 });
 
 describe('QuantumBIP32 security levels', () => {
-  const seed = tools.fromHex('000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f');
-
   it('default security level is LEVEL2 (44)', () => {
-    const master = QuantumBIP32Factory.fromSeed(seed);
     expect(master.securityLevel).toBe(MLDSASecurityLevel.LEVEL2);
     expect(master.publicKey.length).toBe(1312); // ML-DSA-44
     expect(master.privateKey.length).toBe(2560); // ML-DSA-44
   });
 
   it('creates ML-DSA-44 key using enum', () => {
-    const master = QuantumBIP32Factory.fromSeed(seed, undefined, MLDSASecurityLevel.LEVEL2);
     expect(master.securityLevel).toBe(MLDSASecurityLevel.LEVEL2);
     expect(master.publicKey.length).toBe(1312);
     expect(master.privateKey.length).toBe(2560);
@@ -549,85 +492,69 @@ describe('QuantumBIP32 security levels', () => {
   });
 
   it('creates ML-DSA-65 key using enum', () => {
-    const master = QuantumBIP32Factory.fromSeed(seed, undefined, MLDSASecurityLevel.LEVEL3);
-    expect(master.securityLevel).toBe(MLDSASecurityLevel.LEVEL3);
-    expect(master.publicKey.length).toBe(1952);
-    expect(master.privateKey.length).toBe(4032);
+    expect(masterLevel3.securityLevel).toBe(MLDSASecurityLevel.LEVEL3);
+    expect(masterLevel3.publicKey.length).toBe(1952);
+    expect(masterLevel3.privateKey.length).toBe(4032);
 
     const message = new Uint8Array(32).fill(0x42);
-    const signature = master.sign(message);
+    const signature = masterLevel3.sign(message);
     expect(signature.length).toBe(3309);
-    expect(master.verify(message, signature)).toBe(true);
+    expect(masterLevel3.verify(message, signature)).toBe(true);
   });
 
   it('creates ML-DSA-87 key using enum', () => {
-    const master = QuantumBIP32Factory.fromSeed(seed, undefined, MLDSASecurityLevel.LEVEL5);
-    expect(master.securityLevel).toBe(MLDSASecurityLevel.LEVEL5);
-    expect(master.publicKey.length).toBe(2592);
-    expect(master.privateKey.length).toBe(4896);
+    expect(masterLevel5.securityLevel).toBe(MLDSASecurityLevel.LEVEL5);
+    expect(masterLevel5.publicKey.length).toBe(2592);
+    expect(masterLevel5.privateKey.length).toBe(4896);
 
     const message = new Uint8Array(32).fill(0x42);
-    const signature = master.sign(message);
+    const signature = masterLevel5.sign(message);
     expect(signature.length).toBe(4627);
-    expect(master.verify(message, signature)).toBe(true);
+    expect(masterLevel5.verify(message, signature)).toBe(true);
   });
 
   it('child keys inherit security level', () => {
-    const master44 = QuantumBIP32Factory.fromSeed(seed, undefined, MLDSASecurityLevel.LEVEL2);
-    const child44 = master44.deriveHardened(0);
+    const child44 = master.deriveHardened(0);
     expect(child44.securityLevel).toBe(MLDSASecurityLevel.LEVEL2);
 
-    const master87 = QuantumBIP32Factory.fromSeed(seed, undefined, MLDSASecurityLevel.LEVEL5);
-    const child87 = master87.deriveHardened(0);
+    const child87 = masterLevel5.deriveHardened(0);
     expect(child87.securityLevel).toBe(MLDSASecurityLevel.LEVEL5);
   });
 
   it('fromPublicKey supports security levels', () => {
-    const master44 = QuantumBIP32Factory.fromSeed(seed, undefined, MLDSASecurityLevel.LEVEL2);
-    const key44 = QuantumBIP32Factory.fromPublicKey(master44.publicKey, master44.chainCode, undefined, MLDSASecurityLevel.LEVEL2);
+    const key44 = QuantumBIP32Factory.fromPublicKey(master.publicKey, master.chainCode, undefined, MLDSASecurityLevel.LEVEL2);
     expect(key44.securityLevel).toBe(MLDSASecurityLevel.LEVEL2);
 
-    const master87 = QuantumBIP32Factory.fromSeed(seed, undefined, MLDSASecurityLevel.LEVEL5);
-    const key87 = QuantumBIP32Factory.fromPublicKey(master87.publicKey, master87.chainCode, undefined, MLDSASecurityLevel.LEVEL5);
+    const key87 = QuantumBIP32Factory.fromPublicKey(masterLevel5.publicKey, masterLevel5.chainCode, undefined, MLDSASecurityLevel.LEVEL5);
     expect(key87.securityLevel).toBe(MLDSASecurityLevel.LEVEL5);
   });
 
   it('fromPrivateKey supports security levels', () => {
-    const master44 = QuantumBIP32Factory.fromSeed(seed, undefined, MLDSASecurityLevel.LEVEL2);
-    const key44 = QuantumBIP32Factory.fromPrivateKey(master44.privateKey, master44.chainCode, undefined, MLDSASecurityLevel.LEVEL2);
+    const key44 = QuantumBIP32Factory.fromPrivateKey(master.privateKey, master.chainCode, undefined, MLDSASecurityLevel.LEVEL2);
     expect(key44.securityLevel).toBe(MLDSASecurityLevel.LEVEL2);
 
-    const master87 = QuantumBIP32Factory.fromSeed(seed, undefined, MLDSASecurityLevel.LEVEL5);
-    const key87 = QuantumBIP32Factory.fromPrivateKey(master87.privateKey, master87.chainCode, undefined, MLDSASecurityLevel.LEVEL5);
+    const key87 = QuantumBIP32Factory.fromPrivateKey(masterLevel5.privateKey, masterLevel5.chainCode, undefined, MLDSASecurityLevel.LEVEL5);
     expect(key87.securityLevel).toBe(MLDSASecurityLevel.LEVEL5);
   });
 
   it('base58 encoding preserves security level', () => {
-    const master44 = QuantumBIP32Factory.fromSeed(seed, undefined, MLDSASecurityLevel.LEVEL2);
-    const exported44 = master44.toBase58();
-    const imported44 = QuantumBIP32Factory.fromBase58(exported44);
+    const imported44 = QuantumBIP32Factory.fromBase58(masterB58);
     expect(imported44.securityLevel).toBe(MLDSASecurityLevel.LEVEL2);
 
-    const master87 = QuantumBIP32Factory.fromSeed(seed, undefined, MLDSASecurityLevel.LEVEL5);
-    const exported87 = master87.toBase58();
-    const imported87 = QuantumBIP32Factory.fromBase58(exported87);
+    const imported87 = QuantumBIP32Factory.fromBase58(masterLevel5B58);
     expect(imported87.securityLevel).toBe(MLDSASecurityLevel.LEVEL5);
   });
 
   it('throws on invalid security level', () => {
-    expect(() => QuantumBIP32Factory.fromSeed(seed, undefined, 99)).toThrow(/Invalid ML-DSA security level/);
+    expect(() => QuantumBIP32Factory.fromSeed(SEED, undefined, 99)).toThrow(/Invalid ML-DSA security level/);
   });
 
   it('different security levels produce different keys', () => {
-    const master44 = QuantumBIP32Factory.fromSeed(seed, undefined, MLDSASecurityLevel.LEVEL2);
-    const master87 = QuantumBIP32Factory.fromSeed(seed, undefined, MLDSASecurityLevel.LEVEL5);
-
     // Keys should be different even with same seed
-    expect(tools.toHex(master44.publicKey)).not.toBe(tools.toHex(master87.publicKey));
+    expect(tools.toHex(master.publicKey)).not.toBe(tools.toHex(masterLevel5.publicKey));
   });
 
   it('derivation path enum works', () => {
-    const master = QuantumBIP32Factory.fromSeed(seed);
     const child = master.derivePath(QuantumDerivationPath.STANDARD);
     expect(child.depth).toBe(5);
     expect(child.index).toBe(0);
@@ -648,12 +575,10 @@ describe('QuantumBIP32 compatibility', () => {
   });
 
   it('different seeds produce different keys', () => {
-    const seed1 = tools.fromHex('000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f');
     const seed2 = tools.fromHex('ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff');
-    const master1 = QuantumBIP32Factory.fromSeed(seed1);
     const master2 = QuantumBIP32Factory.fromSeed(seed2);
 
-    expect(tools.toHex(master1.publicKey)).not.toBe(tools.toHex(master2.publicKey));
+    expect(tools.toHex(master.publicKey)).not.toBe(tools.toHex(master2.publicKey));
   });
 
   it('16 byte seed works', () => {
@@ -670,29 +595,23 @@ describe('QuantumBIP32 compatibility', () => {
 });
 
 describe('QuantumBIP32 network support', () => {
-  const seed = tools.fromHex('000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f');
-
   it('defaults to mainnet', () => {
-    const master = QuantumBIP32Factory.fromSeed(seed);
     expect(master.network.bech32).toBe('bc');
     expect(master.network.wif).toBe(0x80);
   });
 
   it('creates testnet keys with different version bytes', () => {
-    const mainnet = QuantumBIP32Factory.fromSeed(seed, BITCOIN);
-    const testnet = QuantumBIP32Factory.fromSeed(seed, TESTNET);
-
     // Same seed, different networks
-    expect(mainnet.network.bech32).toBe('bc');
-    expect(testnet.network.bech32).toBe('tb');
+    expect(master.network.bech32).toBe('bc');
+    expect(masterTestnet.network.bech32).toBe('tb');
 
     // Export and check version bytes differ
-    const mainnetB58 = mainnet.toBase58();
-    const testnetB58 = testnet.toBase58();
+    const mainnetB58 = masterB58;
+    const testnetB58 = masterTestnet.toBase58();
     expect(mainnetB58).not.toBe(testnetB58);
 
     // Decode and check versions
-    const mainnetDecoded = bs58check.decode(mainnetB58);
+    const mainnetDecoded = masterB58Bytes;
     const testnetDecoded = bs58check.decode(testnetB58);
     const mainnetVersion = tools.readUInt32(mainnetDecoded, 0, 'BE');
     const testnetVersion = tools.readUInt32(testnetDecoded, 0, 'BE');
@@ -701,29 +620,22 @@ describe('QuantumBIP32 network support', () => {
   });
 
   it('can import testnet keys', () => {
-    const testnet = QuantumBIP32Factory.fromSeed(seed, TESTNET);
-    const exported = testnet.toBase58();
+    const exported = masterTestnet.toBase58();
     const imported = QuantumBIP32Factory.fromBase58(exported);
 
     expect(imported.network.bech32).toBe('tb');
-    expect(tools.toHex(imported.publicKey)).toBe(tools.toHex(testnet.publicKey));
+    expect(tools.toHex(imported.publicKey)).toBe(tools.toHex(masterTestnet.publicKey));
   });
 
   it('network is preserved in child derivation', () => {
-    const testnet = QuantumBIP32Factory.fromSeed(seed, TESTNET);
-    const child = testnet.deriveHardened(0);
-
+    const child = masterTestnet.deriveHardened(0);
     expect(child.network.bech32).toBe('tb');
   });
 
   it('different security levels + networks produce different version bytes', () => {
-    const mainnet44 = QuantumBIP32Factory.fromSeed(seed, BITCOIN, MLDSASecurityLevel.LEVEL2);
-    const mainnet87 = QuantumBIP32Factory.fromSeed(seed, BITCOIN, MLDSASecurityLevel.LEVEL5);
-    const testnet44 = QuantumBIP32Factory.fromSeed(seed, TESTNET, MLDSASecurityLevel.LEVEL2);
-
-    const b58_main44 = mainnet44.toBase58();
-    const b58_main87 = mainnet87.toBase58();
-    const b58_test44 = testnet44.toBase58();
+    const b58_main44 = masterB58;
+    const b58_main87 = masterLevel5B58;
+    const b58_test44 = masterTestnet.toBase58();
 
     // All should be different
     expect(b58_main44).not.toBe(b58_main87);
