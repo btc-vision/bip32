@@ -173,7 +173,7 @@ describe('throws on wrong types', () => {
     it(`derive(${fx.index})`, () => {
       expect(() => {
         master.derive(fx.index)
-      }).toThrow(fx.exception.replace(/^ValiError: /, ''))
+      }).toThrow('Expected UInt32')
     })
   })
 
@@ -181,7 +181,7 @@ describe('throws on wrong types', () => {
     it(`deriveHardened(${fx.index})`, () => {
       expect(() => {
         master.deriveHardened(fx.index)
-      }).toThrow(fx.exception.replace(/^ValiError: /, ''))
+      }).toThrow('Expected UInt31')
     })
   })
 

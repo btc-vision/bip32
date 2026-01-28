@@ -162,4 +162,28 @@ export interface QuantumBIP32API {
     network?: Network,
     securityLevel?: MLDSASecurityLevel,
   ): QuantumBIP32Interface;
+
+  /**
+   * Restore a quantum BIP32 node from precomputed values.
+   * Skips all validation — the caller must ensure values are correct.
+   * Use this when restoring from cache/backup where keys and hierarchy metadata are already known.
+   * @param privateKey - ML-DSA private key (or undefined for neutered)
+   * @param publicKey - ML-DSA public key
+   * @param chainCode - Chain code (32 bytes)
+   * @param depth - Derivation depth
+   * @param index - Child index
+   * @param parentFingerprint - Parent key fingerprint
+   * @param network - Network configuration (defaults to quantum mainnet)
+   * @param securityLevel - ML-DSA security level (44, 65, or 87) - required if not using default
+   */
+  fromPrecomputed(
+    privateKey: Uint8Array | undefined,
+    publicKey: Uint8Array,
+    chainCode: Uint8Array,
+    depth: number,
+    index: number,
+    parentFingerprint: number,
+    network?: Network,
+    securityLevel?: MLDSASecurityLevel,
+  ): QuantumBIP32Interface;
 }

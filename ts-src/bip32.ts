@@ -9,15 +9,22 @@ import {
   Buffer256Bit,
   Buffer33Bytes,
   NetworkSchema,
-  Uint31Schema,
-  Uint32Schema,
 } from './types.js';
 import * as wif from 'wif';
 import * as tools from 'uint8array-tools';
 import { BITCOIN } from './networks.js';
+import { SignerCapability } from '@btc-vision/ecpair';
 import type {
+  Bytes32,
   CryptoBackend,
+  MessageHash,
+  PrivateKey,
+  PublicKey,
+  SchnorrSignature,
+  Signature,
   TinySecp256k1Interface as EcpairTinySecp256k1Interface,
+  UniversalSigner,
+  XOnlyPublicKey,
 } from '@btc-vision/ecpair';
 
 const _bs58check = base58check(sha256);
@@ -25,6 +32,9 @@ const bs58check = {
   encode: (data: Uint8Array): string => _bs58check.encode(data),
   decode: (str: string): Uint8Array => _bs58check.decode(str),
 };
+
+const BITCOIN_SEED = tools.fromUtf8('Bitcoin seed');
+const testedLibs = new WeakSet<object>();
 
 /**
  * Extends ecpair's TinySecp256k1Interface to require pointAddScalar,
@@ -38,31 +48,20 @@ export interface TinySecp256k1Interface extends EcpairTinySecp256k1Interface {
   ): Uint8Array | null;
 }
 
-export interface Signer {
-  publicKey: Uint8Array;
-  lowR: boolean;
-  sign(hash: Uint8Array, lowR?: boolean): Uint8Array;
-  verify(hash: Uint8Array, signature: Uint8Array): boolean;
-  signSchnorr(hash: Uint8Array): Uint8Array;
-  verifySchnorr(hash: Uint8Array, signature: Uint8Array): boolean;
-}
-export interface BIP32Interface extends Signer {
+export interface BIP32Interface extends UniversalSigner {
   chainCode: Uint8Array;
-  network: Network;
   depth: number;
   index: number;
   parentFingerprint: number;
-  privateKey?: Uint8Array;
   identifier: Uint8Array;
   fingerprint: Uint8Array;
+  lowR: boolean;
   isNeutered(): boolean;
   neutered(): BIP32Interface;
   toBase58(): string;
-  toWIF(): string;
   derive(index: number): BIP32Interface;
   deriveHardened(index: number): BIP32Interface;
   derivePath(path: string): BIP32Interface;
-  tweak(t: Uint8Array): Signer;
 }
 
 export interface BIP32API {
@@ -76,6 +75,15 @@ export interface BIP32API {
   fromPrivateKey(
     privateKey: Uint8Array,
     chainCode: Uint8Array,
+    network?: Network,
+  ): BIP32Interface;
+  fromPrecomputed(
+    privateKey: Uint8Array | undefined,
+    publicKey: Uint8Array,
+    chainCode: Uint8Array,
+    depth: number,
+    index: number,
+    parentFingerprint: number,
     network?: Network,
   ): BIP32Interface;
 }
@@ -93,37 +101,68 @@ export function BIP32Factory(
   // At runtime, CryptoBackend branded-type parameters ARE Uint8Array,
   // so we can safely normalize to TinySecp256k1Interface.
   const lib = ecc as unknown as TinySecp256k1Interface;
-  testEcc(lib);
+  if (!testedLibs.has(lib)) {
+    testEcc(lib);
+    testedLibs.add(lib);
+  }
 
   const HIGHEST_BIT = 0x80000000;
 
-  function toXOnly(pubKey: Uint8Array) {
+  function toXOnly(pubKey: Uint8Array): Uint8Array {
     return pubKey.length === 32 ? pubKey : pubKey.slice(1, 33);
   }
 
-  class Bip32Signer implements Signer {
+  class Bip32Signer implements UniversalSigner {
     lowR: boolean = false;
 
     constructor(
       protected __D: Uint8Array | undefined,
       protected __Q: Uint8Array | undefined,
+      readonly network: Network,
     ) {}
 
-    get publicKey(): Uint8Array {
+    get publicKey(): PublicKey {
       if (this.__Q === undefined)
         this.__Q = lib.pointFromScalar(this.__D!, true)!;
-      return this.__Q!;
+      return this.__Q as PublicKey;
     }
 
-    get privateKey(): Uint8Array | undefined {
-      return this.__D;
+    get xOnlyPublicKey(): XOnlyPublicKey {
+      return toXOnly(this.publicKey) as XOnlyPublicKey;
     }
 
-    sign(hash: Uint8Array, lowR?: boolean): Uint8Array {
+    get privateKey(): PrivateKey | undefined {
+      return this.__D as PrivateKey | undefined;
+    }
+
+    get compressed(): boolean {
+      return true;
+    }
+
+    get capabilities(): number {
+      let caps =
+        SignerCapability.EcdsaVerify | SignerCapability.PublicKeyTweak;
+      if (this.__D !== undefined) {
+        caps |= SignerCapability.EcdsaSign | SignerCapability.PrivateKeyExport;
+      }
+      if (lib.signSchnorr && this.__D !== undefined) {
+        caps |= SignerCapability.SchnorrSign;
+      }
+      if (lib.verifySchnorr) {
+        caps |= SignerCapability.SchnorrVerify;
+      }
+      return caps;
+    }
+
+    hasCapability(cap: SignerCapability): boolean {
+      return (this.capabilities & cap) !== 0;
+    }
+
+    sign(hash: MessageHash, lowR?: boolean): Signature {
       if (!this.privateKey) throw new Error('Missing private key');
       if (lowR === undefined) lowR = this.lowR;
       if (!lowR) {
-        return lib.sign(hash, this.privateKey);
+        return lib.sign(hash, this.privateKey) as Signature;
       } else {
         let sig = lib.sign(hash, this.privateKey);
         const extraData = new Uint8Array(32);
@@ -135,25 +174,80 @@ export function BIP32Factory(
           tools.writeUInt32(extraData, 0, counter, 'LE');
           sig = lib.sign(hash, this.privateKey, extraData);
         }
-        return sig;
+        return sig as Signature;
       }
     }
 
-    signSchnorr(hash: Uint8Array): Uint8Array {
+    signSchnorr(hash: MessageHash): SchnorrSignature {
       if (!this.privateKey) throw new Error('Missing private key');
       if (!lib.signSchnorr)
         throw new Error('signSchnorr not supported by ecc library');
-      return lib.signSchnorr(hash, this.privateKey);
+      return lib.signSchnorr(hash, this.privateKey) as SchnorrSignature;
     }
 
-    verify(hash: Uint8Array, signature: Uint8Array): boolean {
+    verify(hash: MessageHash, signature: Signature): boolean {
       return lib.verify(hash, this.publicKey, signature);
     }
 
-    verifySchnorr(hash: Uint8Array, signature: Uint8Array): boolean {
+    verifySchnorr(hash: MessageHash, signature: SchnorrSignature): boolean {
       if (!lib.verifySchnorr)
         throw new Error('verifySchnorr not supported by ecc library');
-      return lib.verifySchnorr(hash, this.publicKey.subarray(1, 33), signature);
+      return lib.verifySchnorr(
+        hash,
+        this.publicKey.subarray(1, 33),
+        signature,
+      );
+    }
+
+    tweak(t: Bytes32): UniversalSigner {
+      if (this.privateKey) return this.tweakFromPrivateKey(t);
+      return this.tweakFromPublicKey(t);
+    }
+
+    toWIF(): string {
+      if (!this.privateKey) throw new TypeError('Missing private key');
+      return wif.encode({
+        version: this.network.wif,
+        privateKey: this.privateKey,
+        compressed: true,
+      });
+    }
+
+    private tweakFromPublicKey(t: Uint8Array): UniversalSigner {
+      const xOnlyPubKey = toXOnly(this.publicKey);
+      // Runtime guard: lib may lack xOnlyPointAddTweak despite interface contract
+      const xOnlyPointAddTweak: typeof lib.xOnlyPointAddTweak | undefined =
+        lib.xOnlyPointAddTweak;
+      if (!xOnlyPointAddTweak)
+        throw new Error('xOnlyPointAddTweak not supported by ecc library');
+      const tweakedPublicKey = xOnlyPointAddTweak(xOnlyPubKey, t);
+      if (!tweakedPublicKey || tweakedPublicKey.xOnlyPubkey === null)
+        throw new Error('Cannot tweak public key!');
+      const parityByte = Uint8Array.from([
+        tweakedPublicKey.parity === 0 ? 0x02 : 0x03,
+      ]);
+      const tweakedPublicKeyCompresed = tools.concat([
+        parityByte,
+        tweakedPublicKey.xOnlyPubkey,
+      ]);
+
+      return new Bip32Signer(undefined, tweakedPublicKeyCompresed, this.network);
+    }
+
+    private tweakFromPrivateKey(t: Uint8Array): UniversalSigner {
+      const hasOddY =
+        this.publicKey[0] === 3 ||
+        (this.publicKey[0] === 4 && (this.publicKey[64] & 1) === 1);
+      const privateKey = (() => {
+        if (!hasOddY) return this.privateKey;
+        else if (!lib.privateNegate)
+          throw new Error('privateNegate not supported by ecc library');
+        else return lib.privateNegate(this.privateKey!);
+      })();
+      const tweakedPrivateKey = lib.privateAdd(privateKey!, t);
+      if (!tweakedPrivateKey) throw new Error('Invalid tweaked private key!');
+
+      return new Bip32Signer(tweakedPrivateKey, undefined, this.network);
     }
   }
 
@@ -162,13 +256,18 @@ export function BIP32Factory(
       __D: Uint8Array | undefined,
       __Q: Uint8Array | undefined,
       public chainCode: Uint8Array,
-      public network: Network,
+      network: Network,
       private __DEPTH = 0,
       private __INDEX = 0,
       private __PARENT_FINGERPRINT = 0x00000000,
     ) {
-      super(__D, __Q);
-      v.parse(NetworkSchema, network);
+      super(__D, __Q, network);
+    }
+
+    #ID: Uint8Array | undefined;
+
+    override get capabilities(): number {
+      return super.capabilities | SignerCapability.HdDerivation;
     }
 
     get depth(): number {
@@ -184,15 +283,13 @@ export function BIP32Factory(
     }
 
     get identifier(): Uint8Array {
-      return crypto.hash160(this.publicKey);
+      if (this.#ID === undefined)
+        this.#ID = crypto.hash160(this.publicKey);
+      return this.#ID;
     }
 
     get fingerprint(): Uint8Array {
-      return this.identifier.slice(0, 4);
-    }
-
-    get compressed(): boolean {
-      return true;
+      return this.identifier.subarray(0, 4);
     }
 
     // Private === not neutered
@@ -202,7 +299,8 @@ export function BIP32Factory(
     }
 
     neutered(): BIP32Interface {
-      return fromPublicKeyLocal(
+      return new BIP32(
+        undefined,
         this.publicKey,
         this.chainCode,
         this.network,
@@ -251,18 +349,10 @@ export function BIP32Factory(
       return bs58check.encode(buffer);
     }
 
-    toWIF(): string {
-      if (!this.privateKey) throw new TypeError('Missing private key');
-      return wif.encode({
-        version: this.network.wif,
-        privateKey: this.privateKey,
-        compressed: true,
-      });
-    }
-
     // https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki#child-key-derivation-ckd-functions
     derive(index: number): BIP32Interface {
-      v.parse(Uint32Schema, index);
+      if (index !== (index >>> 0))
+        throw new TypeError('Expected UInt32, got ' + index);
 
       const isHardened = index >= HIGHEST_BIT;
       const data = new Uint8Array(37);
@@ -292,8 +382,10 @@ export function BIP32Factory(
       // if parse256(IL) >= n, proceed with the next value for i
       if (!lib.isPrivate(IL)) return this.derive(index + 1);
 
+      const parentFp = tools.readUInt32(this.fingerprint, 0, 'BE');
+      const nextDepth = this.depth + 1;
+
       // Private parent key -> private child key
-      let hd: BIP32Interface;
       if (!this.isNeutered()) {
         // ki = parse256(IL) + kpar (mod n)
         const ki = lib.privateAdd(this.privateKey!, IL)!;
@@ -301,13 +393,14 @@ export function BIP32Factory(
         // In case ki == 0, proceed with the next value for i
         if (ki == null) return this.derive(index + 1);
 
-        hd = fromPrivateKeyLocal(
+        return new BIP32(
           ki,
+          undefined,
           IR,
           this.network,
-          this.depth + 1,
+          nextDepth,
           index,
-          tools.readUInt32(this.fingerprint, 0, 'BE'),
+          parentFp,
         );
 
         // Public parent key -> public child key
@@ -319,24 +412,27 @@ export function BIP32Factory(
         // In case Ki is the point at infinity, proceed with the next value for i
         if (Ki === null) return this.derive(index + 1);
 
-        hd = fromPublicKeyLocal(
+        return new BIP32(
+          undefined,
           Ki,
           IR,
           this.network,
-          this.depth + 1,
+          nextDepth,
           index,
-          tools.readUInt32(this.fingerprint, 0, 'BE'),
+          parentFp,
         );
       }
-
-      return hd;
     }
 
     deriveHardened(index: number): BIP32Interface {
-      if (typeof v.parse(Uint31Schema, index) === 'number')
-        // Only derives hardened private keys by default
-        return this.derive(index + HIGHEST_BIT);
-      throw new TypeError('Expected UInt31, got ' + index);
+      if (
+        !Number.isInteger(index) ||
+        index < 0 ||
+        index > 0x7fffffff
+      )
+        throw new TypeError('Expected UInt31, got ' + index);
+      // Only derives hardened private keys by default
+      return this.derive(index + HIGHEST_BIT);
     }
 
     derivePath(path: string): BIP32Interface {
@@ -360,45 +456,6 @@ export function BIP32Factory(
           return prevHd.derive(index);
         }
       }, this as BIP32Interface);
-    }
-
-    tweak(t: Uint8Array): Signer {
-      if (this.privateKey) return this.tweakFromPrivateKey(t);
-      return this.tweakFromPublicKey(t);
-    }
-
-    private tweakFromPublicKey(t: Uint8Array): Signer {
-      const xOnlyPubKey = toXOnly(this.publicKey);
-      if (!lib.xOnlyPointAddTweak)
-        throw new Error('xOnlyPointAddTweak not supported by ecc library');
-      const tweakedPublicKey = lib.xOnlyPointAddTweak(xOnlyPubKey, t);
-      if (!tweakedPublicKey || tweakedPublicKey.xOnlyPubkey === null)
-        throw new Error('Cannot tweak public key!');
-      const parityByte = Uint8Array.from([
-        tweakedPublicKey.parity === 0 ? 0x02 : 0x03,
-      ]);
-      const tweakedPublicKeyCompresed = tools.concat([
-        parityByte,
-        tweakedPublicKey.xOnlyPubkey,
-      ]);
-
-      return new Bip32Signer(undefined, tweakedPublicKeyCompresed);
-    }
-
-    private tweakFromPrivateKey(t: Uint8Array): Signer {
-      const hasOddY =
-        this.publicKey[0] === 3 ||
-        (this.publicKey[0] === 4 && (this.publicKey[64] & 1) === 1);
-      const privateKey = (() => {
-        if (!hasOddY) return this.privateKey;
-        else if (!lib.privateNegate)
-          throw new Error('privateNegate not supported by ecc library');
-        else return lib.privateNegate(this.privateKey!);
-      })();
-      const tweakedPrivateKey = lib.privateAdd(privateKey!, t);
-      if (!tweakedPrivateKey) throw new Error('Invalid tweaked private key!');
-
-      return new Bip32Signer(tweakedPrivateKey, undefined);
     }
   }
 
@@ -482,6 +539,7 @@ export function BIP32Factory(
     v.parse(Buffer256Bit, chainCode);
 
     network = network || BITCOIN;
+    v.parse(NetworkSchema, network);
 
     if (!lib.isPrivate(privateKey))
       throw new TypeError('Private key not in range [1, n)');
@@ -516,6 +574,7 @@ export function BIP32Factory(
     v.parse(Buffer256Bit, chainCode);
 
     network = network || BITCOIN;
+    v.parse(NetworkSchema, network);
 
     // verify the X coordinate is a point on the curve
     if (!lib.isPoint(publicKey))
@@ -532,18 +591,39 @@ export function BIP32Factory(
   }
 
   function fromSeed(seed: Uint8Array, network?: Network): BIP32Interface {
-    v.parse(v.instance(Uint8Array), seed);
+    if (!(seed instanceof Uint8Array))
+      throw new TypeError('Expected Uint8Array');
     if (seed.length < 16)
       throw new TypeError('Seed should be at least 128 bits');
     if (seed.length > 64)
       throw new TypeError('Seed should be at most 512 bits');
     network = network || BITCOIN;
 
-    const I = crypto.hmacSHA512(tools.fromUtf8('Bitcoin seed'), seed);
+    const I = crypto.hmacSHA512(BITCOIN_SEED, seed);
     const IL = I.slice(0, 32);
     const IR = I.slice(32);
 
     return fromPrivateKey(IL, IR, network);
+  }
+
+  function fromPrecomputed(
+    privateKey: Uint8Array | undefined,
+    publicKey: Uint8Array,
+    chainCode: Uint8Array,
+    depth: number,
+    index: number,
+    parentFingerprint: number,
+    network?: Network,
+  ): BIP32Interface {
+    return new BIP32(
+      privateKey,
+      publicKey,
+      chainCode,
+      network || BITCOIN,
+      depth,
+      index,
+      parentFingerprint,
+    );
   }
 
   return {
@@ -551,5 +631,6 @@ export function BIP32Factory(
     fromBase58,
     fromPublicKey,
     fromPrivateKey,
+    fromPrecomputed,
   };
 }

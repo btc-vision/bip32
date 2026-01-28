@@ -5,7 +5,7 @@ export {
   BIP32API,
   TinySecp256k1Interface,
 } from './bip32.js';
-export type { Signer as BIP32Signer } from './bip32.js';
+export type { UniversalSigner as BIP32Signer } from '@btc-vision/ecpair';
 
 // Network configurations
 export { BITCOIN, TESTNET, REGTEST } from './networks.js';

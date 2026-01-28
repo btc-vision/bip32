@@ -50,6 +50,7 @@ const bs58check = {
 };
 const CHAIN_CODE_SIZE = 32;
 const HIGHEST_BIT = 0x80000000;
+const BITCOIN_SEED = tools.fromUtf8('Bitcoin seed');
 /**
  * Quantum signer implementation using ML-DSA
  */
@@ -110,11 +111,14 @@ class QuantumBIP32 extends QuantumBip32Signer {
     get parentFingerprint() {
         return this._parentFingerprint;
     }
+    #ID;
     get identifier() {
-        return crypto.hash160(this.publicKey);
+        if (this.#ID === undefined)
+            this.#ID = crypto.hash160(this.publicKey);
+        return this.#ID;
     }
     get fingerprint() {
-        return this.identifier.slice(0, 4);
+        return this.identifier.subarray(0, 4);
     }
     get securityLevel() {
         return this.config.level;
@@ -175,7 +179,8 @@ class QuantumBIP32 extends QuantumBip32Signer {
      * then ML-DSA for key generation
      */
     derive(index) {
-        v.parse(types_js_1.Uint32Schema, index);
+        if (index !== (index >>> 0))
+            throw new TypeError('Expected UInt32, got ' + index);
         // ML-DSA cannot derive child keys without the private key
         // Unlike EC crypto, you cannot do public key only derivation
         if (this.isNeutered()) {
@@ -211,12 +216,10 @@ class QuantumBIP32 extends QuantumBip32Signer {
         return new QuantumBIP32(privateKey, publicKey, IR, this.config, this.depth + 1, index, tools.readUInt32(this.fingerprint, 0, 'BE'));
     }
     deriveHardened(index) {
-        try {
-            v.parse(types_js_1.Uint31Schema, index);
-        }
-        catch (e) {
+        if (!Number.isInteger(index) ||
+            index < 0 ||
+            index > 0x7fffffff)
             throw new TypeError('Expected UInt31, got ' + index);
-        }
         return this.derive(index + HIGHEST_BIT);
     }
     derivePath(path) {
@@ -246,7 +249,8 @@ class QuantumBIP32 extends QuantumBip32Signer {
  * Follows standard BIP32 pattern: fromSeed(seed, network?, securityLevel?)
  */
 function fromSeed(seed, network, securityLevel) {
-    v.parse(v.instance(Uint8Array), seed);
+    if (!(seed instanceof Uint8Array))
+        throw new TypeError('Expected Uint8Array');
     if (seed.length < 16) {
         throw new TypeError('Seed should be at least 128 bits');
     }
@@ -255,7 +259,7 @@ function fromSeed(seed, network, securityLevel) {
     }
     const config = (0, config_js_1.getMLDSAConfig)(securityLevel || config_js_1.MLDSASecurityLevel.LEVEL2, network || networks_js_1.BITCOIN);
     // Use BIP32 standard HMAC for initial seed derivation
-    const I = crypto.hmacSHA512(tools.fromUtf8('Bitcoin seed'), seed);
+    const I = crypto.hmacSHA512(BITCOIN_SEED, seed);
     const IL = I.slice(0, 32);
     const IR = I.slice(32);
     // Generate ML-DSA master key pair
@@ -410,6 +414,24 @@ function fromKeyPair(privateKey, publicKey, chainCode, network, securityLevel) {
     return new QuantumBIP32(privateKey, publicKey, chainCode, config, 0, 0, 0);
 }
 /**
+ * Restore a quantum BIP32 node from precomputed values.
+ * Skips all validation and key derivation — the caller must ensure values are correct.
+ * Use this when restoring from cache/backup where keys and hierarchy metadata are already known.
+ *
+ * @param privateKey - ML-DSA private key (or undefined for neutered)
+ * @param publicKey - ML-DSA public key
+ * @param chainCode - Chain code (32 bytes)
+ * @param depth - Derivation depth
+ * @param index - Child index
+ * @param parentFingerprint - Parent key fingerprint
+ * @param network - Network configuration
+ * @param securityLevel - ML-DSA security level
+ */
+function fromPrecomputed(privateKey, publicKey, chainCode, depth, index, parentFingerprint, network, securityLevel) {
+    const config = (0, config_js_1.getMLDSAConfig)(securityLevel || config_js_1.MLDSASecurityLevel.LEVEL2, network || networks_js_1.BITCOIN);
+    return new QuantumBIP32(privateKey, publicKey, chainCode, config, depth, index, parentFingerprint);
+}
+/**
  * Quantum BIP32 Factory
  * Provides API for creating and managing ML-DSA hierarchical deterministic keys
  * Supports ML-DSA-44 (default), ML-DSA-65, and ML-DSA-87
@@ -420,4 +442,5 @@ exports.QuantumBIP32Factory = {
     fromPublicKey,
     fromPrivateKey,
     fromKeyPair,
+    fromPrecomputed,
 };
