@@ -6,7 +6,7 @@ import {
   TESTNET,
   REGTEST,
 } from '../src/esm/index.js';
-import tape from 'tape';
+import { describe, it, expect } from 'vitest';
 import * as tools from 'uint8array-tools';
 import { base58check } from '@scure/base';
 import { sha256 } from '@noble/hashes/sha2.js';
@@ -17,278 +17,243 @@ const bs58check = {
   decode: (str) => _bs58check.decode(str),
 };
 
-tape('QuantumBIP32Factory.fromSeed', (t) => {
-  t.test('creates master key from valid seed', (t) => {
+describe('QuantumBIP32Factory.fromSeed', () => {
+  it('creates master key from valid seed', () => {
     const seed = tools.fromHex('000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f');
     const master = QuantumBIP32Factory.fromSeed(seed);
 
-    t.equal(master.depth, 0);
-    t.equal(master.index, 0);
-    t.equal(master.parentFingerprint, 0);
-    t.equal(master.publicKey.length, 1312); // ML-DSA-44 (default)
-    t.equal(master.privateKey.length, 2560); // ML-DSA-44 (default)
-    t.equal(master.chainCode.length, 32);
-    t.equal(master.isNeutered(), false);
-    t.end();
+    expect(master.depth).toBe(0);
+    expect(master.index).toBe(0);
+    expect(master.parentFingerprint).toBe(0);
+    expect(master.publicKey.length).toBe(1312); // ML-DSA-44 (default)
+    expect(master.privateKey.length).toBe(2560); // ML-DSA-44 (default)
+    expect(master.chainCode.length).toBe(32);
+    expect(master.isNeutered()).toBe(false);
   });
 
-  t.test('throws on seed too short', (t) => {
+  it('throws on seed too short', () => {
     const seed = new Uint8Array(15);
-    t.throws(() => QuantumBIP32Factory.fromSeed(seed), /Seed should be at least 128 bits/);
-    t.end();
+    expect(() => QuantumBIP32Factory.fromSeed(seed)).toThrow(/Seed should be at least 128 bits/);
   });
 
-  t.test('throws on seed too long', (t) => {
+  it('throws on seed too long', () => {
     const seed = new Uint8Array(65);
-    t.throws(() => QuantumBIP32Factory.fromSeed(seed), /Seed should be at most 512 bits/);
-    t.end();
+    expect(() => QuantumBIP32Factory.fromSeed(seed)).toThrow(/Seed should be at most 512 bits/);
   });
 
-  t.test('produces deterministic keys from same seed', (t) => {
+  it('produces deterministic keys from same seed', () => {
     const seed = tools.fromHex('000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f');
     const master1 = QuantumBIP32Factory.fromSeed(seed);
     const master2 = QuantumBIP32Factory.fromSeed(seed);
 
-    t.equal(tools.toHex(master1.publicKey), tools.toHex(master2.publicKey));
-    t.equal(tools.toHex(master1.privateKey), tools.toHex(master2.privateKey));
-    t.equal(tools.toHex(master1.chainCode), tools.toHex(master2.chainCode));
-    t.end();
+    expect(tools.toHex(master1.publicKey)).toBe(tools.toHex(master2.publicKey));
+    expect(tools.toHex(master1.privateKey)).toBe(tools.toHex(master2.privateKey));
+    expect(tools.toHex(master1.chainCode)).toBe(tools.toHex(master2.chainCode));
   });
-
-  t.end();
 });
 
-tape('QuantumBIP32 derivation', (t) => {
+describe('QuantumBIP32 derivation', () => {
   const seed = tools.fromHex('000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f');
   const master = QuantumBIP32Factory.fromSeed(seed);
 
-  t.test('derive hardened child', (t) => {
+  it('derive hardened child', () => {
     const child = master.deriveHardened(0);
 
-    t.equal(child.depth, 1);
-    t.equal(child.index, 0x80000000);
-    t.equal(child.publicKey.length, 1312); // ML-DSA-44 (default)
-    t.equal(child.privateKey.length, 2560); // ML-DSA-44 (default)
-    t.notEqual(tools.toHex(child.publicKey), tools.toHex(master.publicKey));
-    t.end();
+    expect(child.depth).toBe(1);
+    expect(child.index).toBe(0x80000000);
+    expect(child.publicKey.length).toBe(1312); // ML-DSA-44 (default)
+    expect(child.privateKey.length).toBe(2560); // ML-DSA-44 (default)
+    expect(tools.toHex(child.publicKey)).not.toBe(tools.toHex(master.publicKey));
   });
 
-  t.test('derive normal child', (t) => {
+  it('derive normal child', () => {
     const child = master.derive(0);
 
-    t.equal(child.depth, 1);
-    t.equal(child.index, 0);
-    t.equal(child.publicKey.length, 1312); // ML-DSA-44 (default)
-    t.equal(child.privateKey.length, 2560); // ML-DSA-44 (default)
-    t.end();
+    expect(child.depth).toBe(1);
+    expect(child.index).toBe(0);
+    expect(child.publicKey.length).toBe(1312); // ML-DSA-44 (default)
+    expect(child.privateKey.length).toBe(2560); // ML-DSA-44 (default)
   });
 
-  t.test('derivePath with hardened path', (t) => {
+  it('derivePath with hardened path', () => {
     const child = master.derivePath(QuantumDerivationPath.STANDARD);
 
-    t.equal(child.depth, 5);
-    t.equal(child.index, 0);
-    t.ok(child.privateKey);
-    t.end();
+    expect(child.depth).toBe(5);
+    expect(child.index).toBe(0);
+    expect(child.privateKey).toBeTruthy();
   });
 
-  t.test('derivePath from child (not master)', (t) => {
+  it('derivePath from child (not master)', () => {
     const child1 = master.deriveHardened(360);
     const child2 = child1.derivePath("0'/0'/0/0");
 
-    t.equal(child2.depth, 5);
-    t.end();
+    expect(child2.depth).toBe(5);
   });
 
-  t.test('throws on derivePath with m prefix on child', (t) => {
+  it('throws on derivePath with m prefix on child', () => {
     const child = master.deriveHardened(360);
-    t.throws(() => child.derivePath("m/0'/0'/0"), /Expected master, got child/);
-    t.end();
+    expect(() => child.derivePath("m/0'/0'/0")).toThrow(/Expected master, got child/);
   });
 
-  t.test('produces deterministic child keys', (t) => {
+  it('produces deterministic child keys', () => {
     const child1 = master.derivePath(QuantumDerivationPath.STANDARD);
     const child2 = master.derivePath(QuantumDerivationPath.STANDARD);
 
-    t.equal(tools.toHex(child1.publicKey), tools.toHex(child2.publicKey));
-    t.equal(tools.toHex(child1.privateKey), tools.toHex(child2.privateKey));
-    t.end();
+    expect(tools.toHex(child1.publicKey)).toBe(tools.toHex(child2.publicKey));
+    expect(tools.toHex(child1.privateKey)).toBe(tools.toHex(child2.privateKey));
   });
 
-  t.test('different paths produce different keys', (t) => {
+  it('different paths produce different keys', () => {
     const child1 = master.derivePath(QuantumDerivationPath.ACCOUNT_0_ADDRESS_0);
     const child2 = master.derivePath(QuantumDerivationPath.ACCOUNT_0_ADDRESS_1);
 
-    t.notEqual(tools.toHex(child1.publicKey), tools.toHex(child2.publicKey));
-    t.end();
+    expect(tools.toHex(child1.publicKey)).not.toBe(tools.toHex(child2.publicKey));
   });
 
-  t.test('derive validates index bounds', (t) => {
-    t.throws(() => master.derive(-1));
-    t.throws(() => master.derive(0x100000000));
-    t.end();
+  it('derive validates index bounds', () => {
+    expect(() => master.derive(-1)).toThrow();
+    expect(() => master.derive(0x100000000)).toThrow();
   });
 
-  t.test('deriveHardened validates index bounds', (t) => {
-    t.throws(() => master.deriveHardened(-1), /Expected UInt31/);
-    t.throws(() => master.deriveHardened(0x80000000), /Expected UInt31/);
-    t.end();
+  it('deriveHardened validates index bounds', () => {
+    expect(() => master.deriveHardened(-1)).toThrow(/Expected UInt31/);
+    expect(() => master.deriveHardened(0x80000000)).toThrow(/Expected UInt31/);
   });
 
-  t.test('deriveHardened throws on non-number input', (t) => {
-    t.throws(() => master.deriveHardened('notanumber'), /Expected UInt31/);
-    t.end();
+  it('deriveHardened throws on non-number input', () => {
+    expect(() => master.deriveHardened('notanumber')).toThrow(/Expected UInt31/);
   });
-
-  t.end();
 });
 
-tape('QuantumBIP32 neutered keys', (t) => {
+describe('QuantumBIP32 neutered keys', () => {
   const seed = tools.fromHex('000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f');
   const master = QuantumBIP32Factory.fromSeed(seed);
 
-  t.test('neutered removes private key', (t) => {
+  it('neutered removes private key', () => {
     const neutered = master.neutered();
 
-    t.equal(neutered.isNeutered(), true);
-    t.equal(neutered.privateKey, undefined);
-    t.equal(tools.toHex(neutered.publicKey), tools.toHex(master.publicKey));
-    t.equal(tools.toHex(neutered.chainCode), tools.toHex(master.chainCode));
-    t.end();
+    expect(neutered.isNeutered()).toBe(true);
+    expect(neutered.privateKey).toBe(undefined);
+    expect(tools.toHex(neutered.publicKey)).toBe(tools.toHex(master.publicKey));
+    expect(tools.toHex(neutered.chainCode)).toBe(tools.toHex(master.chainCode));
   });
 
-  t.test('neutered key cannot sign', (t) => {
+  it('neutered key cannot sign', () => {
     const neutered = master.neutered();
     const message = new Uint8Array(32);
 
-    t.throws(() => neutered.sign(message), /Missing private key/);
-    t.end();
+    expect(() => neutered.sign(message)).toThrow(/Missing private key/);
   });
 
-  t.test('neutered key can verify', (t) => {
+  it('neutered key can verify', () => {
     const message = new Uint8Array(32);
     message.fill(0x42);
     const signature = master.sign(message);
     const neutered = master.neutered();
 
-    t.equal(neutered.verify(message, signature), true);
-    t.end();
+    expect(neutered.verify(message, signature)).toBe(true);
   });
 
-  t.test('neutered key cannot derive any children', (t) => {
+  it('neutered key cannot derive any children', () => {
     const neutered = master.neutered();
 
     // ML-DSA cannot derive children without private key (unlike EC)
-    t.throws(() => neutered.derive(0), /Cannot derive child keys without private key/);
-    t.throws(() => neutered.derive(0x80000000), /Cannot derive child keys without private key/);
-    t.throws(() => neutered.deriveHardened(0), /Cannot derive child keys without private key/);
-    t.end();
+    expect(() => neutered.derive(0)).toThrow(/Cannot derive child keys without private key/);
+    expect(() => neutered.derive(0x80000000)).toThrow(/Cannot derive child keys without private key/);
+    expect(() => neutered.deriveHardened(0)).toThrow(/Cannot derive child keys without private key/);
   });
 
-  t.test('neutered key publicKey getter throws if not available', async (t) => {
+  it('neutered key publicKey getter edge case', () => {
     // This test covers the edge case in QuantumBip32Signer.publicKey getter
     // Since the class is not exported, we'll test through the public API
     // The error path is tested indirectly when we access public key on neutered keys
 
     // This edge case is actually already covered by the neutered key tests above
     // where we verify that neutered.publicKey works correctly
-    t.pass('Edge case covered by neutered key tests');
-    t.end();
   });
-
-  t.end();
 });
 
-tape('QuantumBIP32 signing and verification', (t) => {
+describe('QuantumBIP32 signing and verification', () => {
   const seed = tools.fromHex('000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f');
   const master = QuantumBIP32Factory.fromSeed(seed);
 
-  t.test('sign produces valid signature', (t) => {
+  it('sign produces valid signature', () => {
     const message = new Uint8Array(32);
     message.fill(0x42);
     const signature = master.sign(message);
 
-    t.equal(signature.length, 2420); // ML-DSA-44 (default)
-    t.equal(master.verify(message, signature), true);
-    t.end();
+    expect(signature.length).toBe(2420); // ML-DSA-44 (default)
+    expect(master.verify(message, signature)).toBe(true);
   });
 
-  t.test('verify rejects invalid signature', (t) => {
+  it('verify rejects invalid signature', () => {
     const message = new Uint8Array(32);
     message.fill(0x42);
     const signature = master.sign(message);
     signature[0] ^= 0x01; // Corrupt signature
 
-    t.equal(master.verify(message, signature), false);
-    t.end();
+    expect(master.verify(message, signature)).toBe(false);
   });
 
-  t.test('verify rejects wrong message', (t) => {
+  it('verify rejects wrong message', () => {
     const message1 = new Uint8Array(32);
     message1.fill(0x42);
     const message2 = new Uint8Array(32);
     message2.fill(0x43);
     const signature = master.sign(message1);
 
-    t.equal(master.verify(message2, signature), false);
-    t.end();
+    expect(master.verify(message2, signature)).toBe(false);
   });
 
-  t.test('sign throws without private key', (t) => {
+  it('sign throws without private key', () => {
     const neutered = master.neutered();
     const message = new Uint8Array(32);
 
-    t.throws(() => neutered.sign(message), /Missing private key/);
-    t.end();
+    expect(() => neutered.sign(message)).toThrow(/Missing private key/);
   });
 
-  t.test('signatures are non-deterministic (include entropy)', (t) => {
+  it('signatures are non-deterministic (include entropy)', () => {
     const message = new Uint8Array(32);
     message.fill(0x42);
     const sig1 = master.sign(message);
     const sig2 = master.sign(message);
 
     // Signatures should differ due to randomness
-    t.notEqual(tools.toHex(sig1), tools.toHex(sig2));
+    expect(tools.toHex(sig1)).not.toBe(tools.toHex(sig2));
 
     // But both should verify
-    t.equal(master.verify(message, sig1), true);
-    t.equal(master.verify(message, sig2), true);
-    t.end();
+    expect(master.verify(message, sig1)).toBe(true);
+    expect(master.verify(message, sig2)).toBe(true);
   });
-
-  t.end();
 });
 
-tape('QuantumBIP32 base58 import/export', (t) => {
+describe('QuantumBIP32 base58 import/export', () => {
   const seed = tools.fromHex('000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f');
   const master = QuantumBIP32Factory.fromSeed(seed);
 
-  t.test('export and import private key', (t) => {
+  it('export and import private key', () => {
     const exported = master.toBase58();
     const imported = QuantumBIP32Factory.fromBase58(exported);
 
-    t.equal(tools.toHex(imported.publicKey), tools.toHex(master.publicKey));
-    t.equal(tools.toHex(imported.privateKey), tools.toHex(master.privateKey));
-    t.equal(tools.toHex(imported.chainCode), tools.toHex(master.chainCode));
-    t.equal(imported.depth, master.depth);
-    t.equal(imported.index, master.index);
-    t.equal(imported.parentFingerprint, master.parentFingerprint);
-    t.end();
+    expect(tools.toHex(imported.publicKey)).toBe(tools.toHex(master.publicKey));
+    expect(tools.toHex(imported.privateKey)).toBe(tools.toHex(master.privateKey));
+    expect(tools.toHex(imported.chainCode)).toBe(tools.toHex(master.chainCode));
+    expect(imported.depth).toBe(master.depth);
+    expect(imported.index).toBe(master.index);
+    expect(imported.parentFingerprint).toBe(master.parentFingerprint);
   });
 
-  t.test('export and import public key', (t) => {
+  it('export and import public key', () => {
     const neutered = master.neutered();
     const exported = neutered.toBase58();
     const imported = QuantumBIP32Factory.fromBase58(exported);
 
-    t.equal(tools.toHex(imported.publicKey), tools.toHex(neutered.publicKey));
-    t.equal(imported.privateKey, undefined);
-    t.equal(imported.isNeutered(), true);
-    t.end();
+    expect(tools.toHex(imported.publicKey)).toBe(tools.toHex(neutered.publicKey));
+    expect(imported.privateKey).toBe(undefined);
+    expect(imported.isNeutered()).toBe(true);
   });
 
-  t.test('imported key can sign', (t) => {
+  it('imported key can sign', () => {
     const exported = master.toBase58();
     const imported = QuantumBIP32Factory.fromBase58(exported);
     const message = new Uint8Array(32);
@@ -296,16 +261,14 @@ tape('QuantumBIP32 base58 import/export', (t) => {
 
     const signature = imported.sign(message);
     // Verify with imported key's own verify (they have same keys)
-    t.equal(imported.verify(message, signature), true);
-    t.end();
+    expect(imported.verify(message, signature)).toBe(true);
   });
 
-  t.test('throws on invalid base58', (t) => {
-    t.throws(() => QuantumBIP32Factory.fromBase58('invalid'));
-    t.end();
+  it('throws on invalid base58', () => {
+    expect(() => QuantumBIP32Factory.fromBase58('invalid')).toThrow();
   });
 
-  t.test('throws on invalid version', (t) => {
+  it('throws on invalid version', () => {
     // Create a base58 string with invalid version bytes
     const seed = tools.fromHex('000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f');
     const key = QuantumBIP32Factory.fromSeed(seed);
@@ -316,11 +279,10 @@ tape('QuantumBIP32 base58 import/export', (t) => {
     decoded[0] = 0xFF; // Invalid version byte
     const corrupted = bs58check.encode(decoded);
 
-    t.throws(() => QuantumBIP32Factory.fromBase58(corrupted), /Unknown network version/);
-    t.end();
+    expect(() => QuantumBIP32Factory.fromBase58(corrupted)).toThrow(/Unknown network version/);
   });
 
-  t.test('throws on invalid buffer length', (t) => {
+  it('throws on invalid buffer length', () => {
     // Create a base58 with wrong length
     const seed = tools.fromHex('000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f');
     const key = QuantumBIP32Factory.fromSeed(seed);
@@ -331,11 +293,10 @@ tape('QuantumBIP32 base58 import/export', (t) => {
     const truncated = decoded.slice(0, 100);
     const corrupted = bs58check.encode(truncated);
 
-    t.throws(() => QuantumBIP32Factory.fromBase58(corrupted), /Invalid (buffer length|private key size|public key size)/);
-    t.end();
+    expect(() => QuantumBIP32Factory.fromBase58(corrupted)).toThrow(/Invalid (buffer length|private key size|public key size)/);
   });
 
-  t.test('throws on invalid private key size', (t) => {
+  it('throws on invalid private key size', () => {
     // Test invalid private key sizes by creating buffer with wrong key size
     const seed = tools.fromHex('000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f');
     const key = QuantumBIP32Factory.fromSeed(seed, BITCOIN, MLDSASecurityLevel.LEVEL2);
@@ -355,11 +316,10 @@ tape('QuantumBIP32 base58 import/export', (t) => {
     }
 
     const corrupted = bs58check.encode(buffer);
-    t.throws(() => QuantumBIP32Factory.fromBase58(corrupted), /Invalid (private key size|buffer length)/);
-    t.end();
+    expect(() => QuantumBIP32Factory.fromBase58(corrupted)).toThrow(/Invalid (private key size|buffer length)/);
   });
 
-  t.test('throws on invalid public key size', (t) => {
+  it('throws on invalid public key size', () => {
     // Test invalid public key sizes
     const seed = tools.fromHex('000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f');
     const key = QuantumBIP32Factory.fromSeed(seed, BITCOIN, MLDSASecurityLevel.LEVEL2).neutered();
@@ -379,11 +339,10 @@ tape('QuantumBIP32 base58 import/export', (t) => {
     }
 
     const corrupted = bs58check.encode(buffer);
-    t.throws(() => QuantumBIP32Factory.fromBase58(corrupted), /Invalid (public key size|buffer length)/);
-    t.end();
+    expect(() => QuantumBIP32Factory.fromBase58(corrupted)).toThrow(/Invalid (public key size|buffer length)/);
   });
 
-  t.test('throws on invalid parent fingerprint for master', (t) => {
+  it('throws on invalid parent fingerprint for master', () => {
     // Create a base58 with depth=0 but non-zero parent fingerprint
     const seed = tools.fromHex('000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f');
     const key = QuantumBIP32Factory.fromSeed(seed);
@@ -400,11 +359,10 @@ tape('QuantumBIP32 base58 import/export', (t) => {
 
     const corrupted = bs58check.encode(decoded);
 
-    t.throws(() => QuantumBIP32Factory.fromBase58(corrupted), /Invalid parent fingerprint/);
-    t.end();
+    expect(() => QuantumBIP32Factory.fromBase58(corrupted)).toThrow(/Invalid parent fingerprint/);
   });
 
-  t.test('throws on invalid index for master', (t) => {
+  it('throws on invalid index for master', () => {
     // Create a base58 with depth=0 but non-zero index
     const seed = tools.fromHex('000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f');
     const key = QuantumBIP32Factory.fromSeed(seed);
@@ -426,298 +384,258 @@ tape('QuantumBIP32 base58 import/export', (t) => {
 
     const corrupted = bs58check.encode(decoded);
 
-    t.throws(() => QuantumBIP32Factory.fromBase58(corrupted), /Invalid index/);
-    t.end();
+    expect(() => QuantumBIP32Factory.fromBase58(corrupted)).toThrow(/Invalid index/);
   });
 
-  t.test('child key export includes correct metadata', (t) => {
+  it('child key export includes correct metadata', () => {
     const child = master.derivePath(QuantumDerivationPath.STANDARD);
     const exported = child.toBase58();
     const imported = QuantumBIP32Factory.fromBase58(exported);
 
-    t.equal(imported.depth, 5);
-    t.equal(imported.index, 0);
-    t.notEqual(imported.parentFingerprint, 0);
-    t.end();
+    expect(imported.depth).toBe(5);
+    expect(imported.index).toBe(0);
+    expect(imported.parentFingerprint).not.toBe(0);
   });
-
-  t.end();
 });
 
-tape('QuantumBIP32Factory.fromPublicKey', (t) => {
+describe('QuantumBIP32Factory.fromPublicKey', () => {
   const seed = tools.fromHex('000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f');
   const master = QuantumBIP32Factory.fromSeed(seed);
 
-  t.test('creates key from public key and chain code', (t) => {
+  it('creates key from public key and chain code', () => {
     const key = QuantumBIP32Factory.fromPublicKey(master.publicKey, master.chainCode);
 
-    t.equal(tools.toHex(key.publicKey), tools.toHex(master.publicKey));
-    t.equal(tools.toHex(key.chainCode), tools.toHex(master.chainCode));
-    t.equal(key.privateKey, undefined);
-    t.equal(key.isNeutered(), true);
-    t.end();
+    expect(tools.toHex(key.publicKey)).toBe(tools.toHex(master.publicKey));
+    expect(tools.toHex(key.chainCode)).toBe(tools.toHex(master.chainCode));
+    expect(key.privateKey).toBe(undefined);
+    expect(key.isNeutered()).toBe(true);
   });
 
-  t.test('throws on invalid public key length', (t) => {
+  it('throws on invalid public key length', () => {
     const invalidPubKey = new Uint8Array(100);
     const chainCode = new Uint8Array(32);
 
-    t.throws(() => QuantumBIP32Factory.fromPublicKey(invalidPubKey, chainCode), /Invalid public key length/);
-    t.end();
+    expect(() => QuantumBIP32Factory.fromPublicKey(invalidPubKey, chainCode)).toThrow(/Invalid public key length/);
   });
 
-  t.test('throws on invalid chain code length', (t) => {
+  it('throws on invalid chain code length', () => {
     const invalidChainCode = new Uint8Array(16);
 
-    t.throws(() => QuantumBIP32Factory.fromPublicKey(master.publicKey, invalidChainCode), /Invalid chain code length/);
-    t.end();
+    expect(() => QuantumBIP32Factory.fromPublicKey(master.publicKey, invalidChainCode)).toThrow(/Invalid chain code length/);
   });
-
-  t.end();
 });
 
-tape('QuantumBIP32Factory.fromPrivateKey', (t) => {
+describe('QuantumBIP32Factory.fromPrivateKey', () => {
   const seed = tools.fromHex('000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f');
   const master = QuantumBIP32Factory.fromSeed(seed);
 
-  t.test('creates key from private key and chain code', (t) => {
+  it('creates key from private key and chain code', () => {
     const key = QuantumBIP32Factory.fromPrivateKey(master.privateKey, master.chainCode);
 
-    t.equal(tools.toHex(key.privateKey), tools.toHex(master.privateKey));
-    t.equal(tools.toHex(key.publicKey), tools.toHex(master.publicKey));
-    t.equal(tools.toHex(key.chainCode), tools.toHex(master.chainCode));
-    t.equal(key.isNeutered(), false);
-    t.end();
+    expect(tools.toHex(key.privateKey)).toBe(tools.toHex(master.privateKey));
+    expect(tools.toHex(key.publicKey)).toBe(tools.toHex(master.publicKey));
+    expect(tools.toHex(key.chainCode)).toBe(tools.toHex(master.chainCode));
+    expect(key.isNeutered()).toBe(false);
   });
 
-  t.test('throws on invalid private key length', (t) => {
+  it('throws on invalid private key length', () => {
     const invalidPrivKey = new Uint8Array(100);
     const chainCode = new Uint8Array(32);
 
-    t.throws(() => QuantumBIP32Factory.fromPrivateKey(invalidPrivKey, chainCode), /Invalid private key length/);
-    t.end();
+    expect(() => QuantumBIP32Factory.fromPrivateKey(invalidPrivKey, chainCode)).toThrow(/Invalid private key length/);
   });
 
-  t.test('throws on invalid chain code length', (t) => {
+  it('throws on invalid chain code length', () => {
     const invalidChainCode = new Uint8Array(16);
 
-    t.throws(() => QuantumBIP32Factory.fromPrivateKey(master.privateKey, invalidChainCode), /Invalid chain code length/);
-    t.end();
+    expect(() => QuantumBIP32Factory.fromPrivateKey(master.privateKey, invalidChainCode)).toThrow(/Invalid chain code length/);
   });
-
-  t.end();
 });
 
-tape('QuantumBIP32 identifier and fingerprint', (t) => {
+describe('QuantumBIP32 identifier and fingerprint', () => {
   const seed = tools.fromHex('000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f');
   const master = QuantumBIP32Factory.fromSeed(seed);
 
-  t.test('identifier is 20 bytes', (t) => {
-    t.equal(master.identifier.length, 20);
-    t.end();
+  it('identifier is 20 bytes', () => {
+    expect(master.identifier.length).toBe(20);
   });
 
-  t.test('fingerprint is first 4 bytes of identifier', (t) => {
-    t.equal(master.fingerprint.length, 4);
-    t.equal(tools.toHex(master.fingerprint), tools.toHex(master.identifier.slice(0, 4)));
-    t.end();
+  it('fingerprint is first 4 bytes of identifier', () => {
+    expect(master.fingerprint.length).toBe(4);
+    expect(tools.toHex(master.fingerprint)).toBe(tools.toHex(master.identifier.slice(0, 4)));
   });
 
-  t.test('child has non-zero parent fingerprint', (t) => {
+  it('child has non-zero parent fingerprint', () => {
     const child = master.deriveHardened(0);
-    t.notEqual(child.parentFingerprint, 0);
+    expect(child.parentFingerprint).not.toBe(0);
 
     // Parent fingerprint is stored as a number, convert to compare
     const parentFingerprintBuffer = new Uint8Array(4);
     const view = new DataView(parentFingerprintBuffer.buffer);
     view.setUint32(0, child.parentFingerprint, false); // Big-endian
 
-    t.equal(tools.toHex(parentFingerprintBuffer), tools.toHex(master.fingerprint));
-    t.end();
+    expect(tools.toHex(parentFingerprintBuffer)).toBe(tools.toHex(master.fingerprint));
   });
 
-  t.test('master has zero parent fingerprint', (t) => {
-    t.equal(master.parentFingerprint, 0);
-    t.end();
+  it('master has zero parent fingerprint', () => {
+    expect(master.parentFingerprint).toBe(0);
   });
-
-  t.end();
 });
 
-tape('QuantumBIP32 edge cases', (t) => {
-  t.test('can derive index 0', (t) => {
+describe('QuantumBIP32 edge cases', () => {
+  it('can derive index 0', () => {
     const seed = tools.fromHex('000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f');
     const master = QuantumBIP32Factory.fromSeed(seed);
     const child = master.derive(0);
 
-    t.equal(child.index, 0);
-    t.end();
+    expect(child.index).toBe(0);
   });
 
-  t.test('can derive max non-hardened index', (t) => {
+  it('can derive max non-hardened index', () => {
     const seed = tools.fromHex('000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f');
     const master = QuantumBIP32Factory.fromSeed(seed);
     const child = master.derive(0x7fffffff);
 
-    t.equal(child.index, 0x7fffffff);
-    t.end();
+    expect(child.index).toBe(0x7fffffff);
   });
 
-  t.test('can derive max hardened index', (t) => {
+  it('can derive max hardened index', () => {
     const seed = tools.fromHex('000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f');
     const master = QuantumBIP32Factory.fromSeed(seed);
     const child = master.derive(0xffffffff);
 
-    t.equal(child.index, 0xffffffff);
-    t.end();
+    expect(child.index).toBe(0xffffffff);
   });
 
-  t.test('derivePath handles various formats', (t) => {
+  it('derivePath handles various formats', () => {
     const seed = tools.fromHex('000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f');
     const master = QuantumBIP32Factory.fromSeed(seed);
 
-    t.doesNotThrow(() => master.derivePath("m/0"));
-    t.doesNotThrow(() => master.derivePath("m/0'"));
-    t.doesNotThrow(() => master.derivePath("m/0'/1"));
-    t.doesNotThrow(() => master.derivePath("m/0'/1/2'/3"));
-    t.end();
+    expect(() => master.derivePath("m/0")).not.toThrow();
+    expect(() => master.derivePath("m/0'")).not.toThrow();
+    expect(() => master.derivePath("m/0'/1")).not.toThrow();
+    expect(() => master.derivePath("m/0'/1/2'/3")).not.toThrow();
   });
 
-  t.test('very deep derivation path', (t) => {
+  it('very deep derivation path', () => {
     const seed = tools.fromHex('000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f');
     const master = QuantumBIP32Factory.fromSeed(seed);
     const deep = master.derivePath("m/0'/1'/2'/3'/4'/5'/6'/7'/8'/9'");
 
-    t.equal(deep.depth, 10);
-    t.end();
+    expect(deep.depth).toBe(10);
   });
-
-  t.end();
 });
 
-tape('QuantumBIP32 security levels', (t) => {
+describe('QuantumBIP32 security levels', () => {
   const seed = tools.fromHex('000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f');
 
-  t.test('default security level is LEVEL2 (44)', (t) => {
+  it('default security level is LEVEL2 (44)', () => {
     const master = QuantumBIP32Factory.fromSeed(seed);
-    t.equal(master.securityLevel, MLDSASecurityLevel.LEVEL2);
-    t.equal(master.publicKey.length, 1312); // ML-DSA-44
-    t.equal(master.privateKey.length, 2560); // ML-DSA-44
-    t.end();
+    expect(master.securityLevel).toBe(MLDSASecurityLevel.LEVEL2);
+    expect(master.publicKey.length).toBe(1312); // ML-DSA-44
+    expect(master.privateKey.length).toBe(2560); // ML-DSA-44
   });
 
-  t.test('creates ML-DSA-44 key using enum', (t) => {
+  it('creates ML-DSA-44 key using enum', () => {
     const master = QuantumBIP32Factory.fromSeed(seed, undefined, MLDSASecurityLevel.LEVEL2);
-    t.equal(master.securityLevel, MLDSASecurityLevel.LEVEL2);
-    t.equal(master.publicKey.length, 1312);
-    t.equal(master.privateKey.length, 2560);
+    expect(master.securityLevel).toBe(MLDSASecurityLevel.LEVEL2);
+    expect(master.publicKey.length).toBe(1312);
+    expect(master.privateKey.length).toBe(2560);
 
     const message = new Uint8Array(32).fill(0x42);
     const signature = master.sign(message);
-    t.equal(signature.length, 2420);
-    t.equal(master.verify(message, signature), true);
-    t.end();
+    expect(signature.length).toBe(2420);
+    expect(master.verify(message, signature)).toBe(true);
   });
 
-  t.test('creates ML-DSA-65 key using enum', (t) => {
+  it('creates ML-DSA-65 key using enum', () => {
     const master = QuantumBIP32Factory.fromSeed(seed, undefined, MLDSASecurityLevel.LEVEL3);
-    t.equal(master.securityLevel, MLDSASecurityLevel.LEVEL3);
-    t.equal(master.publicKey.length, 1952);
-    t.equal(master.privateKey.length, 4032);
+    expect(master.securityLevel).toBe(MLDSASecurityLevel.LEVEL3);
+    expect(master.publicKey.length).toBe(1952);
+    expect(master.privateKey.length).toBe(4032);
 
     const message = new Uint8Array(32).fill(0x42);
     const signature = master.sign(message);
-    t.equal(signature.length, 3309);
-    t.equal(master.verify(message, signature), true);
-    t.end();
+    expect(signature.length).toBe(3309);
+    expect(master.verify(message, signature)).toBe(true);
   });
 
-  t.test('creates ML-DSA-87 key using enum', (t) => {
+  it('creates ML-DSA-87 key using enum', () => {
     const master = QuantumBIP32Factory.fromSeed(seed, undefined, MLDSASecurityLevel.LEVEL5);
-    t.equal(master.securityLevel, MLDSASecurityLevel.LEVEL5);
-    t.equal(master.publicKey.length, 2592);
-    t.equal(master.privateKey.length, 4896);
+    expect(master.securityLevel).toBe(MLDSASecurityLevel.LEVEL5);
+    expect(master.publicKey.length).toBe(2592);
+    expect(master.privateKey.length).toBe(4896);
 
     const message = new Uint8Array(32).fill(0x42);
     const signature = master.sign(message);
-    t.equal(signature.length, 4627);
-    t.equal(master.verify(message, signature), true);
-    t.end();
+    expect(signature.length).toBe(4627);
+    expect(master.verify(message, signature)).toBe(true);
   });
 
-  t.test('child keys inherit security level', (t) => {
+  it('child keys inherit security level', () => {
     const master44 = QuantumBIP32Factory.fromSeed(seed, undefined, MLDSASecurityLevel.LEVEL2);
     const child44 = master44.deriveHardened(0);
-    t.equal(child44.securityLevel, MLDSASecurityLevel.LEVEL2);
+    expect(child44.securityLevel).toBe(MLDSASecurityLevel.LEVEL2);
 
     const master87 = QuantumBIP32Factory.fromSeed(seed, undefined, MLDSASecurityLevel.LEVEL5);
     const child87 = master87.deriveHardened(0);
-    t.equal(child87.securityLevel, MLDSASecurityLevel.LEVEL5);
-    t.end();
+    expect(child87.securityLevel).toBe(MLDSASecurityLevel.LEVEL5);
   });
 
-  t.test('fromPublicKey supports security levels', (t) => {
+  it('fromPublicKey supports security levels', () => {
     const master44 = QuantumBIP32Factory.fromSeed(seed, undefined, MLDSASecurityLevel.LEVEL2);
     const key44 = QuantumBIP32Factory.fromPublicKey(master44.publicKey, master44.chainCode, undefined, MLDSASecurityLevel.LEVEL2);
-    t.equal(key44.securityLevel, MLDSASecurityLevel.LEVEL2);
+    expect(key44.securityLevel).toBe(MLDSASecurityLevel.LEVEL2);
 
     const master87 = QuantumBIP32Factory.fromSeed(seed, undefined, MLDSASecurityLevel.LEVEL5);
     const key87 = QuantumBIP32Factory.fromPublicKey(master87.publicKey, master87.chainCode, undefined, MLDSASecurityLevel.LEVEL5);
-    t.equal(key87.securityLevel, MLDSASecurityLevel.LEVEL5);
-    t.end();
+    expect(key87.securityLevel).toBe(MLDSASecurityLevel.LEVEL5);
   });
 
-  t.test('fromPrivateKey supports security levels', (t) => {
+  it('fromPrivateKey supports security levels', () => {
     const master44 = QuantumBIP32Factory.fromSeed(seed, undefined, MLDSASecurityLevel.LEVEL2);
     const key44 = QuantumBIP32Factory.fromPrivateKey(master44.privateKey, master44.chainCode, undefined, MLDSASecurityLevel.LEVEL2);
-    t.equal(key44.securityLevel, MLDSASecurityLevel.LEVEL2);
+    expect(key44.securityLevel).toBe(MLDSASecurityLevel.LEVEL2);
 
     const master87 = QuantumBIP32Factory.fromSeed(seed, undefined, MLDSASecurityLevel.LEVEL5);
     const key87 = QuantumBIP32Factory.fromPrivateKey(master87.privateKey, master87.chainCode, undefined, MLDSASecurityLevel.LEVEL5);
-    t.equal(key87.securityLevel, MLDSASecurityLevel.LEVEL5);
-    t.end();
+    expect(key87.securityLevel).toBe(MLDSASecurityLevel.LEVEL5);
   });
 
-  t.test('base58 encoding preserves security level', (t) => {
+  it('base58 encoding preserves security level', () => {
     const master44 = QuantumBIP32Factory.fromSeed(seed, undefined, MLDSASecurityLevel.LEVEL2);
     const exported44 = master44.toBase58();
     const imported44 = QuantumBIP32Factory.fromBase58(exported44);
-    t.equal(imported44.securityLevel, MLDSASecurityLevel.LEVEL2);
+    expect(imported44.securityLevel).toBe(MLDSASecurityLevel.LEVEL2);
 
     const master87 = QuantumBIP32Factory.fromSeed(seed, undefined, MLDSASecurityLevel.LEVEL5);
     const exported87 = master87.toBase58();
     const imported87 = QuantumBIP32Factory.fromBase58(exported87);
-    t.equal(imported87.securityLevel, MLDSASecurityLevel.LEVEL5);
-    t.end();
+    expect(imported87.securityLevel).toBe(MLDSASecurityLevel.LEVEL5);
   });
 
-  t.test('throws on invalid security level', (t) => {
-    t.throws(() => QuantumBIP32Factory.fromSeed(seed, undefined, 99), /Invalid ML-DSA security level/);
-    t.end();
+  it('throws on invalid security level', () => {
+    expect(() => QuantumBIP32Factory.fromSeed(seed, undefined, 99)).toThrow(/Invalid ML-DSA security level/);
   });
 
-  t.test('different security levels produce different keys', (t) => {
+  it('different security levels produce different keys', () => {
     const master44 = QuantumBIP32Factory.fromSeed(seed, undefined, MLDSASecurityLevel.LEVEL2);
     const master87 = QuantumBIP32Factory.fromSeed(seed, undefined, MLDSASecurityLevel.LEVEL5);
 
     // Keys should be different even with same seed
-    t.notEqual(tools.toHex(master44.publicKey), tools.toHex(master87.publicKey));
-    t.end();
+    expect(tools.toHex(master44.publicKey)).not.toBe(tools.toHex(master87.publicKey));
   });
 
-  t.test('derivation path enum works', (t) => {
+  it('derivation path enum works', () => {
     const master = QuantumBIP32Factory.fromSeed(seed);
     const child = master.derivePath(QuantumDerivationPath.STANDARD);
-    t.equal(child.depth, 5);
-    t.equal(child.index, 0);
-    t.end();
+    expect(child.depth).toBe(5);
+    expect(child.index).toBe(0);
   });
-
-  t.end();
 });
 
-tape('QuantumBIP32 compatibility', (t) => {
-  t.test('same seed produces same keys across instances', (t) => {
+describe('QuantumBIP32 compatibility', () => {
+  it('same seed produces same keys across instances', () => {
     const seed = tools.fromHex('ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff');
     const master1 = QuantumBIP32Factory.fromSeed(seed);
     const master2 = QuantumBIP32Factory.fromSeed(seed);
@@ -725,104 +643,91 @@ tape('QuantumBIP32 compatibility', (t) => {
     const child1 = master1.derivePath(QuantumDerivationPath.STANDARD);
     const child2 = master2.derivePath(QuantumDerivationPath.STANDARD);
 
-    t.equal(tools.toHex(child1.privateKey), tools.toHex(child2.privateKey));
-    t.equal(tools.toHex(child1.publicKey), tools.toHex(child2.publicKey));
-    t.end();
+    expect(tools.toHex(child1.privateKey)).toBe(tools.toHex(child2.privateKey));
+    expect(tools.toHex(child1.publicKey)).toBe(tools.toHex(child2.publicKey));
   });
 
-  t.test('different seeds produce different keys', (t) => {
+  it('different seeds produce different keys', () => {
     const seed1 = tools.fromHex('000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f');
     const seed2 = tools.fromHex('ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff');
     const master1 = QuantumBIP32Factory.fromSeed(seed1);
     const master2 = QuantumBIP32Factory.fromSeed(seed2);
 
-    t.notEqual(tools.toHex(master1.publicKey), tools.toHex(master2.publicKey));
-    t.end();
+    expect(tools.toHex(master1.publicKey)).not.toBe(tools.toHex(master2.publicKey));
   });
 
-  t.test('16 byte seed works', (t) => {
+  it('16 byte seed works', () => {
     const seed = new Uint8Array(16);
     seed.fill(0x42);
-    t.doesNotThrow(() => QuantumBIP32Factory.fromSeed(seed));
-    t.end();
+    expect(() => QuantumBIP32Factory.fromSeed(seed)).not.toThrow();
   });
 
-  t.test('64 byte seed works', (t) => {
+  it('64 byte seed works', () => {
     const seed = new Uint8Array(64);
     seed.fill(0x42);
-    t.doesNotThrow(() => QuantumBIP32Factory.fromSeed(seed));
-    t.end();
+    expect(() => QuantumBIP32Factory.fromSeed(seed)).not.toThrow();
   });
-
-  t.end();
 });
 
-tape('QuantumBIP32 network support', (t) => {
+describe('QuantumBIP32 network support', () => {
   const seed = tools.fromHex('000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f');
 
-  t.test('defaults to mainnet', (t) => {
+  it('defaults to mainnet', () => {
     const master = QuantumBIP32Factory.fromSeed(seed);
-    t.equal(master.network.bech32, 'bc');
-    t.equal(master.network.wif, 0x80);
-    t.end();
+    expect(master.network.bech32).toBe('bc');
+    expect(master.network.wif).toBe(0x80);
   });
 
-  t.test('creates testnet keys with different version bytes', (t) => {
+  it('creates testnet keys with different version bytes', () => {
     const mainnet = QuantumBIP32Factory.fromSeed(seed, BITCOIN);
     const testnet = QuantumBIP32Factory.fromSeed(seed, TESTNET);
 
     // Same seed, different networks
-    t.equal(mainnet.network.bech32, 'bc');
-    t.equal(testnet.network.bech32, 'tb');
-    
+    expect(mainnet.network.bech32).toBe('bc');
+    expect(testnet.network.bech32).toBe('tb');
+
     // Export and check version bytes differ
     const mainnetB58 = mainnet.toBase58();
     const testnetB58 = testnet.toBase58();
-    t.notEqual(mainnetB58, testnetB58);
-    
+    expect(mainnetB58).not.toBe(testnetB58);
+
     // Decode and check versions
     const mainnetDecoded = bs58check.decode(mainnetB58);
     const testnetDecoded = bs58check.decode(testnetB58);
     const mainnetVersion = tools.readUInt32(mainnetDecoded, 0, 'BE');
     const testnetVersion = tools.readUInt32(testnetDecoded, 0, 'BE');
-    
-    t.notEqual(mainnetVersion, testnetVersion);
-    t.end();
+
+    expect(mainnetVersion).not.toBe(testnetVersion);
   });
 
-  t.test('can import testnet keys', (t) => {
+  it('can import testnet keys', () => {
     const testnet = QuantumBIP32Factory.fromSeed(seed, TESTNET);
     const exported = testnet.toBase58();
     const imported = QuantumBIP32Factory.fromBase58(exported);
-    
-    t.equal(imported.network.bech32, 'tb');
-    t.equal(tools.toHex(imported.publicKey), tools.toHex(testnet.publicKey));
-    t.end();
+
+    expect(imported.network.bech32).toBe('tb');
+    expect(tools.toHex(imported.publicKey)).toBe(tools.toHex(testnet.publicKey));
   });
 
-  t.test('network is preserved in child derivation', (t) => {
+  it('network is preserved in child derivation', () => {
     const testnet = QuantumBIP32Factory.fromSeed(seed, TESTNET);
     const child = testnet.deriveHardened(0);
-    
-    t.equal(child.network.bech32, 'tb');
-    t.end();
+
+    expect(child.network.bech32).toBe('tb');
   });
 
-  t.test('different security levels + networks produce different version bytes', (t) => {
+  it('different security levels + networks produce different version bytes', () => {
     const mainnet44 = QuantumBIP32Factory.fromSeed(seed, BITCOIN, MLDSASecurityLevel.LEVEL2);
     const mainnet87 = QuantumBIP32Factory.fromSeed(seed, BITCOIN, MLDSASecurityLevel.LEVEL5);
     const testnet44 = QuantumBIP32Factory.fromSeed(seed, TESTNET, MLDSASecurityLevel.LEVEL2);
-    
+
     const b58_main44 = mainnet44.toBase58();
     const b58_main87 = mainnet87.toBase58();
     const b58_test44 = testnet44.toBase58();
-    
-    // All should be different
-    t.notEqual(b58_main44, b58_main87);
-    t.notEqual(b58_main44, b58_test44);
-    t.notEqual(b58_main87, b58_test44);
-    t.end();
-  });
 
-  t.end();
+    // All should be different
+    expect(b58_main44).not.toBe(b58_main87);
+    expect(b58_main44).not.toBe(b58_test44);
+    expect(b58_main87).not.toBe(b58_test44);
+  });
 });
