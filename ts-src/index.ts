@@ -5,6 +5,7 @@ export {
   BIP32API,
   TinySecp256k1Interface,
 } from './bip32.js';
+export type { Signer as BIP32Signer } from './bip32.js';
 
 // Network configurations
 export { BITCOIN, TESTNET, REGTEST } from './networks.js';

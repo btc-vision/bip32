@@ -4,7 +4,7 @@ import {
   ml_dsa87,
 } from '@btc-vision/post-quantum/ml-dsa.js';
 import { Network } from '../types.js';
-import { BITCOIN, TESTNET, REGTEST } from '../networks.js';
+import { BITCOIN, REGTEST, TESTNET } from '../networks.js';
 
 /**
  * ML-DSA security levels

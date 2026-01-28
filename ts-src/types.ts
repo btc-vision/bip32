@@ -1,5 +1,7 @@
 import * as v from 'valibot';
 
+export type { Network, Bip32Versions as Bip32 } from '@btc-vision/ecpair';
+
 export const Uint32Schema = v.pipe(
   v.number(),
   v.integer(),
@@ -33,7 +35,7 @@ const Bip32Schema = v.object({
 export const NetworkSchema = v.object({
   wif: Uint8Schema,
   bip32: Bip32Schema,
-  messagePrefix: v.string(),
+  messagePrefix: v.union([v.string(), v.instance(Uint8Array)]),
   bech32: v.string(),
   bech32Opnet: v.optional(v.string()),
   pubKeyHash: Uint8Schema,
@@ -44,6 +46,3 @@ export const Bip32PathSchema = v.pipe(
   v.string(),
   v.regex(/^(m\/)?(\d+'?\/)*\d+'?$/),
 );
-
-export type Bip32 = v.InferOutput<typeof Bip32Schema>;
-export type Network = v.InferOutput<typeof NetworkSchema>;

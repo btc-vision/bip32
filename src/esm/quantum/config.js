@@ -1,5 +1,5 @@
 import { ml_dsa44, ml_dsa65, ml_dsa87, } from '@btc-vision/post-quantum/ml-dsa.js';
-import { BITCOIN, TESTNET, REGTEST } from '../networks.js';
+import { BITCOIN, REGTEST, TESTNET } from '../networks.js';
 /**
  * ML-DSA security levels
  *

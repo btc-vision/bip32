@@ -1,33 +1,32 @@
 import { randomBytes } from '@btc-vision/post-quantum/utils.js';
 import * as crypto from '../crypto.js';
-import { Uint8ArrayOrBuffer } from '../Buffer.js';
 import * as tools from 'uint8array-tools';
 import * as v from 'valibot';
 import {
-  Uint32Schema,
-  Uint31Schema,
   Bip32PathSchema,
   Network,
+  Uint31Schema,
+  Uint32Schema,
 } from '../types.js';
 import {
-  QuantumBIP32Interface,
   QuantumBIP32API,
+  QuantumBIP32Interface,
   QuantumSigner,
 } from './types.js';
 import { base58check } from '@scure/base';
 import { sha256 } from '@noble/hashes/sha2.js';
 import {
-  MLDSASecurityLevel,
-  MLDSAConfig,
-  getMLDSAConfig,
   findNetworkByVersion,
+  getMLDSAConfig,
+  MLDSAConfig,
+  MLDSASecurityLevel,
 } from './config.js';
 import { BITCOIN as DEFAULT_NETWORK } from '../networks.js';
 
 const _bs58check = base58check(sha256);
 const bs58check = {
-  encode: (data: Uint8ArrayOrBuffer): string => _bs58check.encode(data),
-  decode: (str: string): Uint8ArrayOrBuffer => _bs58check.decode(str),
+  encode: (data: Uint8Array): string => _bs58check.encode(data),
+  decode: (str: string): Uint8Array => _bs58check.decode(str),
 };
 
 const CHAIN_CODE_SIZE = 32;
@@ -38,23 +37,23 @@ const HIGHEST_BIT = 0x80000000;
  */
 class QuantumBip32Signer implements QuantumSigner {
   constructor(
-    protected _privateKey: Uint8ArrayOrBuffer | undefined,
-    protected _publicKey: Uint8ArrayOrBuffer | undefined,
+    protected _privateKey: Uint8Array | undefined,
+    protected _publicKey: Uint8Array | undefined,
     protected config: MLDSAConfig,
   ) {}
 
-  get publicKey(): Uint8ArrayOrBuffer {
+  get publicKey(): Uint8Array {
     if (!this._publicKey) {
       throw new Error('Public key not available');
     }
     return this._publicKey;
   }
 
-  get privateKey(): Uint8ArrayOrBuffer | undefined {
+  get privateKey(): Uint8Array | undefined {
     return this._privateKey;
   }
 
-  sign(hash: Uint8ArrayOrBuffer): Uint8ArrayOrBuffer {
+  sign(hash: Uint8Array): Uint8Array {
     if (!this._privateKey) {
       throw new Error('Missing private key');
     }
@@ -66,7 +65,7 @@ class QuantumBip32Signer implements QuantumSigner {
     return signature;
   }
 
-  verify(hash: Uint8ArrayOrBuffer, signature: Uint8ArrayOrBuffer): boolean {
+  verify(hash: Uint8Array, signature: Uint8Array): boolean {
     return this.config.algorithm.verify(signature, hash, this._publicKey!);
   }
 }
@@ -77,9 +76,9 @@ class QuantumBip32Signer implements QuantumSigner {
  */
 class QuantumBIP32 extends QuantumBip32Signer implements QuantumBIP32Interface {
   constructor(
-    _privateKey: Uint8ArrayOrBuffer | undefined,
-    _publicKey: Uint8ArrayOrBuffer | undefined,
-    public chainCode: Uint8ArrayOrBuffer,
+    _privateKey: Uint8Array | undefined,
+    _publicKey: Uint8Array | undefined,
+    public chainCode: Uint8Array,
     config: MLDSAConfig,
     private _depth: number = 0,
     private _index: number = 0,
@@ -100,11 +99,11 @@ class QuantumBIP32 extends QuantumBip32Signer implements QuantumBIP32Interface {
     return this._parentFingerprint;
   }
 
-  get identifier(): Uint8ArrayOrBuffer {
+  get identifier(): Uint8Array {
     return crypto.hash160(this.publicKey);
   }
 
-  get fingerprint(): Uint8ArrayOrBuffer {
+  get fingerprint(): Uint8Array {
     return this.identifier.slice(0, 4);
   }
 
@@ -277,7 +276,7 @@ class QuantumBIP32 extends QuantumBip32Signer implements QuantumBIP32Interface {
  * Follows standard BIP32 pattern: fromSeed(seed, network?, securityLevel?)
  */
 function fromSeed(
-  seed: Uint8ArrayOrBuffer,
+  seed: Uint8Array,
   network?: Network,
   securityLevel?: MLDSASecurityLevel,
 ): QuantumBIP32Interface {
@@ -431,8 +430,8 @@ function fromBase58(inString: string): QuantumBIP32Interface {
  * Follows standard BIP32 pattern: fromPublicKey(publicKey, chainCode, network?, securityLevel?)
  */
 function fromPublicKey(
-  publicKey: Uint8ArrayOrBuffer,
-  chainCode: Uint8ArrayOrBuffer,
+  publicKey: Uint8Array,
+  chainCode: Uint8Array,
   network?: Network,
   securityLevel?: MLDSASecurityLevel,
 ): QuantumBIP32Interface {
@@ -460,8 +459,8 @@ function fromPublicKey(
  * Follows standard BIP32 pattern: fromPrivateKey(privateKey, chainCode, network?, securityLevel?)
  */
 function fromPrivateKey(
-  privateKey: Uint8ArrayOrBuffer,
-  chainCode: Uint8ArrayOrBuffer,
+  privateKey: Uint8Array,
+  chainCode: Uint8Array,
   network?: Network,
   securityLevel?: MLDSASecurityLevel,
 ): QuantumBIP32Interface {
@@ -502,9 +501,9 @@ function fromPrivateKey(
  * @param securityLevel - ML-DSA security level
  */
 function fromKeyPair(
-  privateKey: Uint8ArrayOrBuffer,
-  publicKey: Uint8ArrayOrBuffer,
-  chainCode: Uint8ArrayOrBuffer,
+  privateKey: Uint8Array,
+  publicKey: Uint8Array,
+  chainCode: Uint8Array,
   network?: Network,
   securityLevel?: MLDSASecurityLevel,
 ): QuantumBIP32Interface {

@@ -12,8 +12,18 @@ const bs58check = {
     encode: (data) => _bs58check.encode(data),
     decode: (str) => _bs58check.decode(str),
 };
+/**
+ * Creates a BIP32 HD wallet factory.
+ *
+ * Accepts either a raw `tiny-secp256k1` object ({@link TinySecp256k1Interface})
+ * or a {@link CryptoBackend} from `@btc-vision/ecpair` (e.g. `createNobleBackend()`
+ * or `createLegacyBackend(ecc)`).
+ */
 export function BIP32Factory(ecc) {
-    testEcc(ecc);
+    // At runtime, CryptoBackend branded-type parameters ARE Uint8Array,
+    // so we can safely normalize to TinySecp256k1Interface.
+    const lib = ecc;
+    testEcc(lib);
     const HIGHEST_BIT = 0x80000000;
     function toXOnly(pubKey) {
         return pubKey.length === 32 ? pubKey : pubKey.slice(1, 33);
@@ -28,7 +38,7 @@ export function BIP32Factory(ecc) {
         }
         get publicKey() {
             if (this.__Q === undefined)
-                this.__Q = ecc.pointFromScalar(this.__D, true);
+                this.__Q = lib.pointFromScalar(this.__D, true);
             return this.__Q;
         }
         get privateKey() {
@@ -40,10 +50,10 @@ export function BIP32Factory(ecc) {
             if (lowR === undefined)
                 lowR = this.lowR;
             if (!lowR) {
-                return ecc.sign(hash, this.privateKey);
+                return lib.sign(hash, this.privateKey);
             }
             else {
-                let sig = ecc.sign(hash, this.privateKey);
+                let sig = lib.sign(hash, this.privateKey);
                 const extraData = new Uint8Array(32);
                 let counter = 0;
                 // if first try is lowR, skip the loop
@@ -51,7 +61,7 @@ export function BIP32Factory(ecc) {
                 while (sig[0] > 0x7f) {
                     counter++;
                     tools.writeUInt32(extraData, 0, counter, 'LE');
-                    sig = ecc.sign(hash, this.privateKey, extraData);
+                    sig = lib.sign(hash, this.privateKey, extraData);
                 }
                 return sig;
             }
@@ -59,17 +69,17 @@ export function BIP32Factory(ecc) {
         signSchnorr(hash) {
             if (!this.privateKey)
                 throw new Error('Missing private key');
-            if (!ecc.signSchnorr)
+            if (!lib.signSchnorr)
                 throw new Error('signSchnorr not supported by ecc library');
-            return ecc.signSchnorr(hash, this.privateKey);
+            return lib.signSchnorr(hash, this.privateKey);
         }
         verify(hash, signature) {
-            return ecc.verify(hash, this.publicKey, signature);
+            return lib.verify(hash, this.publicKey, signature);
         }
         verifySchnorr(hash, signature) {
-            if (!ecc.verifySchnorr)
+            if (!lib.verifySchnorr)
                 throw new Error('verifySchnorr not supported by ecc library');
-            return ecc.verifySchnorr(hash, this.publicKey.subarray(1, 33), signature);
+            return lib.verifySchnorr(hash, this.publicKey.subarray(1, 33), signature);
         }
     }
     class BIP32 extends Bip32Signer {
@@ -177,13 +187,13 @@ export function BIP32Factory(ecc) {
             const IL = I.slice(0, 32);
             const IR = I.slice(32);
             // if parse256(IL) >= n, proceed with the next value for i
-            if (!ecc.isPrivate(IL))
+            if (!lib.isPrivate(IL))
                 return this.derive(index + 1);
             // Private parent key -> private child key
             let hd;
             if (!this.isNeutered()) {
                 // ki = parse256(IL) + kpar (mod n)
-                const ki = ecc.privateAdd(this.privateKey, IL);
+                const ki = lib.privateAdd(this.privateKey, IL);
                 // In case ki == 0, proceed with the next value for i
                 if (ki == null)
                     return this.derive(index + 1);
@@ -193,7 +203,7 @@ export function BIP32Factory(ecc) {
             else {
                 // Ki = point(parse256(IL)) + Kpar
                 //    = G*IL + Kpar
-                const Ki = ecc.pointAddScalar(this.publicKey, IL, true);
+                const Ki = lib.pointAddScalar(this.publicKey, IL, true);
                 // In case Ki is the point at infinity, proceed with the next value for i
                 if (Ki === null)
                     return this.derive(index + 1);
@@ -234,9 +244,9 @@ export function BIP32Factory(ecc) {
         }
         tweakFromPublicKey(t) {
             const xOnlyPubKey = toXOnly(this.publicKey);
-            if (!ecc.xOnlyPointAddTweak)
+            if (!lib.xOnlyPointAddTweak)
                 throw new Error('xOnlyPointAddTweak not supported by ecc library');
-            const tweakedPublicKey = ecc.xOnlyPointAddTweak(xOnlyPubKey, t);
+            const tweakedPublicKey = lib.xOnlyPointAddTweak(xOnlyPubKey, t);
             if (!tweakedPublicKey || tweakedPublicKey.xOnlyPubkey === null)
                 throw new Error('Cannot tweak public key!');
             const parityByte = Uint8Array.from([
@@ -254,12 +264,12 @@ export function BIP32Factory(ecc) {
             const privateKey = (() => {
                 if (!hasOddY)
                     return this.privateKey;
-                else if (!ecc.privateNegate)
+                else if (!lib.privateNegate)
                     throw new Error('privateNegate not supported by ecc library');
                 else
-                    return ecc.privateNegate(this.privateKey);
+                    return lib.privateNegate(this.privateKey);
             })();
-            const tweakedPrivateKey = ecc.privateAdd(privateKey, t);
+            const tweakedPrivateKey = lib.privateAdd(privateKey, t);
             if (!tweakedPrivateKey)
                 throw new Error('Invalid tweaked private key!');
             return new Bip32Signer(tweakedPrivateKey, undefined);
@@ -311,7 +321,7 @@ export function BIP32Factory(ecc) {
         v.parse(Buffer256Bit, privateKey);
         v.parse(Buffer256Bit, chainCode);
         network = network || BITCOIN;
-        if (!ecc.isPrivate(privateKey))
+        if (!lib.isPrivate(privateKey))
             throw new TypeError('Private key not in range [1, n)');
         return new BIP32(privateKey, undefined, chainCode, network, depth, index, parentFingerprint);
     }
@@ -323,7 +333,7 @@ export function BIP32Factory(ecc) {
         v.parse(Buffer256Bit, chainCode);
         network = network || BITCOIN;
         // verify the X coordinate is a point on the curve
-        if (!ecc.isPoint(publicKey))
+        if (!lib.isPoint(publicKey))
             throw new TypeError('Point is not on the curve');
         return new BIP32(undefined, publicKey, chainCode, network, depth, index, parentFingerprint);
     }

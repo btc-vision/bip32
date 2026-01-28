@@ -11,7 +11,7 @@ const Bip32Schema = v.object({
 export const NetworkSchema = v.object({
     wif: Uint8Schema,
     bip32: Bip32Schema,
-    messagePrefix: v.string(),
+    messagePrefix: v.union([v.string(), v.instance(Uint8Array)]),
     bech32: v.string(),
     bech32Opnet: v.optional(v.string()),
     pubKeyHash: Uint8Schema,

@@ -1,8 +1,7 @@
 import { TinySecp256k1Interface } from './bip32';
 import * as tools from 'uint8array-tools';
-import { Uint8ArrayOrBuffer } from './Buffer.js';
 
-const h = (hex: string): Uint8ArrayOrBuffer => tools.fromHex(hex);
+const h = (hex: string): Uint8Array => tools.fromHex(hex);
 
 export function testEcc(ecc: TinySecp256k1Interface): void {
   assert(
