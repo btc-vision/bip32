@@ -2,10 +2,10 @@ import { randomBytes } from '@btc-vision/post-quantum/utils.js';
 import * as crypto from '../crypto.js';
 import * as tools from 'uint8array-tools';
 import * as v from 'valibot';
-import { Uint32Schema, Uint31Schema, Bip32PathSchema, } from '../types.js';
+import { Bip32PathSchema, Uint31Schema, Uint32Schema, } from '../types.js';
 import { base58check } from '@scure/base';
 import { sha256 } from '@noble/hashes/sha2.js';
-import { MLDSASecurityLevel, getMLDSAConfig, findNetworkByVersion, } from './config.js';
+import { findNetworkByVersion, getMLDSAConfig, MLDSASecurityLevel, } from './config.js';
 import { BITCOIN as DEFAULT_NETWORK } from '../networks.js';
 const _bs58check = base58check(sha256);
 const bs58check = {

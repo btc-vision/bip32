@@ -1,4 +1,3 @@
-import { Uint8ArrayOrBuffer } from '../Buffer.js';
 import { MLDSASecurityLevel } from './config.js';
 import { Network } from '../types.js';
 
@@ -13,9 +12,9 @@ import { Network } from '../types.js';
  */
 export interface MLDSAKeyPair {
   /** Private key containing polynomial vectors and matrices */
-  privateKey: Uint8ArrayOrBuffer;
+  privateKey: Uint8Array;
   /** Public key */
-  publicKey: Uint8ArrayOrBuffer;
+  publicKey: Uint8Array;
 }
 
 /**
@@ -26,17 +25,17 @@ export interface MLDSAKeyPair {
  */
 export interface QuantumSigner {
   /** ML-DSA public key (size depends on security level) */
-  publicKey: Uint8ArrayOrBuffer;
+  publicKey: Uint8Array;
 
   /** ML-DSA private key (size depends on security level), undefined for neutered keys */
-  privateKey?: Uint8ArrayOrBuffer;
+  privateKey?: Uint8Array;
 
   /**
    * Sign a message hash using ML-DSA
    * @param hash - The hash to sign
    * @returns ML-DSA signature (size depends on security level)
    */
-  sign(hash: Uint8ArrayOrBuffer): Uint8ArrayOrBuffer;
+  sign(hash: Uint8Array): Uint8Array;
 
   /**
    * Verify a signature using ML-DSA
@@ -44,20 +43,20 @@ export interface QuantumSigner {
    * @param signature - The ML-DSA signature to verify
    * @returns true if signature is valid
    */
-  verify(hash: Uint8ArrayOrBuffer, signature: Uint8ArrayOrBuffer): boolean;
+  verify(hash: Uint8Array, signature: Uint8Array): boolean;
 }
 
 /**
  * Quantum BIP32 interface extending standard BIP32 with ML-DSA support
  */
 export interface QuantumBIP32Interface extends QuantumSigner {
-  chainCode: Uint8ArrayOrBuffer;
+  chainCode: Uint8Array;
   network: Network;
   depth: number;
   index: number;
   parentFingerprint: number;
-  identifier: Uint8ArrayOrBuffer;
-  fingerprint: Uint8ArrayOrBuffer;
+  identifier: Uint8Array;
+  fingerprint: Uint8Array;
   securityLevel: MLDSASecurityLevel;
 
   /**
@@ -106,7 +105,7 @@ export interface QuantumBIP32API {
    * @param securityLevel - ML-DSA security level (44, 65, or 87) - defaults to 44
    */
   fromSeed(
-    seed: Uint8ArrayOrBuffer,
+    seed: Uint8Array,
     network?: Network,
     securityLevel?: MLDSASecurityLevel,
   ): QuantumBIP32Interface;
@@ -126,8 +125,8 @@ export interface QuantumBIP32API {
    * @param securityLevel - ML-DSA security level (44, 65, or 87) - required if not using default
    */
   fromPublicKey(
-    publicKey: Uint8ArrayOrBuffer,
-    chainCode: Uint8ArrayOrBuffer,
+    publicKey: Uint8Array,
+    chainCode: Uint8Array,
     network?: Network,
     securityLevel?: MLDSASecurityLevel,
   ): QuantumBIP32Interface;
@@ -140,8 +139,8 @@ export interface QuantumBIP32API {
    * @param securityLevel - ML-DSA security level (44, 65, or 87) - required if not using default
    */
   fromPrivateKey(
-    privateKey: Uint8ArrayOrBuffer,
-    chainCode: Uint8ArrayOrBuffer,
+    privateKey: Uint8Array,
+    chainCode: Uint8Array,
     network?: Network,
     securityLevel?: MLDSASecurityLevel,
   ): QuantumBIP32Interface;
@@ -157,9 +156,9 @@ export interface QuantumBIP32API {
    * @param securityLevel - ML-DSA security level (44, 65, or 87) - required if not using default
    */
   fromKeyPair(
-    privateKey: Uint8ArrayOrBuffer,
-    publicKey: Uint8ArrayOrBuffer,
-    chainCode: Uint8ArrayOrBuffer,
+    privateKey: Uint8Array,
+    publicKey: Uint8Array,
+    chainCode: Uint8Array,
     network?: Network,
     securityLevel?: MLDSASecurityLevel,
   ): QuantumBIP32Interface;

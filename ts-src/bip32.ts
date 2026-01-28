@@ -3,6 +3,7 @@ import { testEcc } from './testecc.js';
 import { base58check } from '@scure/base';
 import { sha256 } from '@noble/hashes/sha2.js';
 import * as v from 'valibot';
+import type { Network } from './types.js';
 import {
   Bip32PathSchema,
   Buffer256Bit,
@@ -13,45 +14,47 @@ import {
 } from './types.js';
 import * as wif from 'wif';
 import * as tools from 'uint8array-tools';
-import { Uint8ArrayOrBuffer } from './Buffer.js';
 import { BITCOIN } from './networks.js';
+import type {
+  CryptoBackend,
+  TinySecp256k1Interface as EcpairTinySecp256k1Interface,
+} from '@btc-vision/ecpair';
+
 const _bs58check = base58check(sha256);
 const bs58check = {
-  encode: (data: Uint8ArrayOrBuffer): string => _bs58check.encode(data),
-  decode: (str: string): Uint8ArrayOrBuffer => _bs58check.decode(str),
+  encode: (data: Uint8Array): string => _bs58check.encode(data),
+  decode: (str: string): Uint8Array => _bs58check.decode(str),
 };
 
-interface Network {
-  wif: number;
-  bip32: {
-    public: number;
-    private: number;
-  };
-  messagePrefix?: string;
-  bech32?: string;
-  pubKeyHash?: number;
-  scriptHash?: number;
+/**
+ * Extends ecpair's TinySecp256k1Interface to require pointAddScalar,
+ * which bip32 key derivation needs unconditionally.
+ */
+export interface TinySecp256k1Interface extends EcpairTinySecp256k1Interface {
+  pointAddScalar(
+    p: Uint8Array,
+    tweak: Uint8Array,
+    compressed?: boolean,
+  ): Uint8Array | null;
 }
+
 export interface Signer {
-  publicKey: Uint8ArrayOrBuffer;
+  publicKey: Uint8Array;
   lowR: boolean;
-  sign(hash: Uint8ArrayOrBuffer, lowR?: boolean): Uint8ArrayOrBuffer;
-  verify(hash: Uint8ArrayOrBuffer, signature: Uint8ArrayOrBuffer): boolean;
-  signSchnorr(hash: Uint8ArrayOrBuffer): Uint8ArrayOrBuffer;
-  verifySchnorr(
-    hash: Uint8ArrayOrBuffer,
-    signature: Uint8ArrayOrBuffer,
-  ): boolean;
+  sign(hash: Uint8Array, lowR?: boolean): Uint8Array;
+  verify(hash: Uint8Array, signature: Uint8Array): boolean;
+  signSchnorr(hash: Uint8Array): Uint8Array;
+  verifySchnorr(hash: Uint8Array, signature: Uint8Array): boolean;
 }
 export interface BIP32Interface extends Signer {
-  chainCode: Uint8ArrayOrBuffer;
+  chainCode: Uint8Array;
   network: Network;
   depth: number;
   index: number;
   parentFingerprint: number;
-  privateKey?: Uint8ArrayOrBuffer;
-  identifier: Uint8ArrayOrBuffer;
-  fingerprint: Uint8ArrayOrBuffer;
+  privateKey?: Uint8Array;
+  identifier: Uint8Array;
+  fingerprint: Uint8Array;
   isNeutered(): boolean;
   neutered(): BIP32Interface;
   toBase58(): string;
@@ -59,79 +62,42 @@ export interface BIP32Interface extends Signer {
   derive(index: number): BIP32Interface;
   deriveHardened(index: number): BIP32Interface;
   derivePath(path: string): BIP32Interface;
-  tweak(t: Uint8ArrayOrBuffer): Signer;
+  tweak(t: Uint8Array): Signer;
 }
 
 export interface BIP32API {
-  fromSeed(seed: Uint8ArrayOrBuffer, network?: Network): BIP32Interface;
+  fromSeed(seed: Uint8Array, network?: Network): BIP32Interface;
   fromBase58(inString: string, network?: Network): BIP32Interface;
   fromPublicKey(
-    publicKey: Uint8ArrayOrBuffer,
-    chainCode: Uint8ArrayOrBuffer,
+    publicKey: Uint8Array,
+    chainCode: Uint8Array,
     network?: Network,
   ): BIP32Interface;
   fromPrivateKey(
-    privateKey: Uint8ArrayOrBuffer,
-    chainCode: Uint8ArrayOrBuffer,
+    privateKey: Uint8Array,
+    chainCode: Uint8Array,
     network?: Network,
   ): BIP32Interface;
 }
 
-interface XOnlyPointAddTweakResult {
-  parity: 1 | 0;
-  xOnlyPubkey: Uint8ArrayOrBuffer;
-}
-
-export interface TinySecp256k1Interface {
-  isPoint(p: Uint8ArrayOrBuffer): boolean;
-  isPrivate(d: Uint8ArrayOrBuffer): boolean;
-  pointFromScalar(
-    d: Uint8ArrayOrBuffer,
-    compressed?: boolean,
-  ): Uint8ArrayOrBuffer | null;
-  pointAddScalar(
-    p: Uint8ArrayOrBuffer,
-    tweak: Uint8ArrayOrBuffer,
-    compressed?: boolean,
-  ): Uint8ArrayOrBuffer | null;
-  privateAdd(
-    d: Uint8ArrayOrBuffer,
-    tweak: Uint8ArrayOrBuffer,
-  ): Uint8ArrayOrBuffer | null;
-  sign(
-    h: Uint8ArrayOrBuffer,
-    d: Uint8ArrayOrBuffer,
-    e?: Uint8ArrayOrBuffer,
-  ): Uint8ArrayOrBuffer;
-  signSchnorr?(
-    h: Uint8ArrayOrBuffer,
-    d: Uint8ArrayOrBuffer,
-    e?: Uint8ArrayOrBuffer,
-  ): Uint8ArrayOrBuffer;
-  verify(
-    h: Uint8ArrayOrBuffer,
-    Q: Uint8ArrayOrBuffer,
-    signature: Uint8ArrayOrBuffer,
-    strict?: boolean,
-  ): boolean;
-  verifySchnorr?(
-    h: Uint8ArrayOrBuffer,
-    Q: Uint8ArrayOrBuffer,
-    signature: Uint8ArrayOrBuffer,
-  ): boolean;
-  xOnlyPointAddTweak?(
-    p: Uint8ArrayOrBuffer,
-    tweak: Uint8ArrayOrBuffer,
-  ): XOnlyPointAddTweakResult | null;
-  privateNegate?(d: Uint8ArrayOrBuffer): Uint8ArrayOrBuffer;
-}
-
-export function BIP32Factory(ecc: TinySecp256k1Interface): BIP32API {
-  testEcc(ecc);
+/**
+ * Creates a BIP32 HD wallet factory.
+ *
+ * Accepts either a raw `tiny-secp256k1` object ({@link TinySecp256k1Interface})
+ * or a {@link CryptoBackend} from `@btc-vision/ecpair` (e.g. `createNobleBackend()`
+ * or `createLegacyBackend(ecc)`).
+ */
+export function BIP32Factory(
+  ecc: TinySecp256k1Interface | CryptoBackend,
+): BIP32API {
+  // At runtime, CryptoBackend branded-type parameters ARE Uint8Array,
+  // so we can safely normalize to TinySecp256k1Interface.
+  const lib = ecc as unknown as TinySecp256k1Interface;
+  testEcc(lib);
 
   const HIGHEST_BIT = 0x80000000;
 
-  function toXOnly(pubKey: Uint8ArrayOrBuffer) {
+  function toXOnly(pubKey: Uint8Array) {
     return pubKey.length === 32 ? pubKey : pubKey.slice(1, 33);
   }
 
@@ -139,27 +105,27 @@ export function BIP32Factory(ecc: TinySecp256k1Interface): BIP32API {
     lowR: boolean = false;
 
     constructor(
-      protected __D: Uint8ArrayOrBuffer | undefined,
-      protected __Q: Uint8ArrayOrBuffer | undefined,
+      protected __D: Uint8Array | undefined,
+      protected __Q: Uint8Array | undefined,
     ) {}
 
-    get publicKey(): Uint8ArrayOrBuffer {
+    get publicKey(): Uint8Array {
       if (this.__Q === undefined)
-        this.__Q = ecc.pointFromScalar(this.__D!, true)!;
+        this.__Q = lib.pointFromScalar(this.__D!, true)!;
       return this.__Q!;
     }
 
-    get privateKey(): Uint8ArrayOrBuffer | undefined {
+    get privateKey(): Uint8Array | undefined {
       return this.__D;
     }
 
-    sign(hash: Uint8ArrayOrBuffer, lowR?: boolean): Uint8ArrayOrBuffer {
+    sign(hash: Uint8Array, lowR?: boolean): Uint8Array {
       if (!this.privateKey) throw new Error('Missing private key');
       if (lowR === undefined) lowR = this.lowR;
       if (!lowR) {
-        return ecc.sign(hash, this.privateKey);
+        return lib.sign(hash, this.privateKey);
       } else {
-        let sig = ecc.sign(hash, this.privateKey);
+        let sig = lib.sign(hash, this.privateKey);
         const extraData = new Uint8Array(32);
         let counter = 0;
         // if first try is lowR, skip the loop
@@ -167,38 +133,35 @@ export function BIP32Factory(ecc: TinySecp256k1Interface): BIP32API {
         while (sig[0] > 0x7f) {
           counter++;
           tools.writeUInt32(extraData, 0, counter, 'LE');
-          sig = ecc.sign(hash, this.privateKey, extraData);
+          sig = lib.sign(hash, this.privateKey, extraData);
         }
         return sig;
       }
     }
 
-    signSchnorr(hash: Uint8ArrayOrBuffer): Uint8ArrayOrBuffer {
+    signSchnorr(hash: Uint8Array): Uint8Array {
       if (!this.privateKey) throw new Error('Missing private key');
-      if (!ecc.signSchnorr)
+      if (!lib.signSchnorr)
         throw new Error('signSchnorr not supported by ecc library');
-      return ecc.signSchnorr(hash, this.privateKey);
+      return lib.signSchnorr(hash, this.privateKey);
     }
 
-    verify(hash: Uint8ArrayOrBuffer, signature: Uint8ArrayOrBuffer): boolean {
-      return ecc.verify(hash, this.publicKey, signature);
+    verify(hash: Uint8Array, signature: Uint8Array): boolean {
+      return lib.verify(hash, this.publicKey, signature);
     }
 
-    verifySchnorr(
-      hash: Uint8ArrayOrBuffer,
-      signature: Uint8ArrayOrBuffer,
-    ): boolean {
-      if (!ecc.verifySchnorr)
+    verifySchnorr(hash: Uint8Array, signature: Uint8Array): boolean {
+      if (!lib.verifySchnorr)
         throw new Error('verifySchnorr not supported by ecc library');
-      return ecc.verifySchnorr(hash, this.publicKey.subarray(1, 33), signature);
+      return lib.verifySchnorr(hash, this.publicKey.subarray(1, 33), signature);
     }
   }
 
   class BIP32 extends Bip32Signer implements BIP32Interface {
     constructor(
-      __D: Uint8ArrayOrBuffer | undefined,
-      __Q: Uint8ArrayOrBuffer | undefined,
-      public chainCode: Uint8ArrayOrBuffer,
+      __D: Uint8Array | undefined,
+      __Q: Uint8Array | undefined,
+      public chainCode: Uint8Array,
       public network: Network,
       private __DEPTH = 0,
       private __INDEX = 0,
@@ -220,11 +183,11 @@ export function BIP32Factory(ecc: TinySecp256k1Interface): BIP32API {
       return this.__PARENT_FINGERPRINT;
     }
 
-    get identifier(): Uint8ArrayOrBuffer {
+    get identifier(): Uint8Array {
       return crypto.hash160(this.publicKey);
     }
 
-    get fingerprint(): Uint8ArrayOrBuffer {
+    get fingerprint(): Uint8Array {
       return this.identifier.slice(0, 4);
     }
 
@@ -327,13 +290,13 @@ export function BIP32Factory(ecc: TinySecp256k1Interface): BIP32API {
       const IR = I.slice(32);
 
       // if parse256(IL) >= n, proceed with the next value for i
-      if (!ecc.isPrivate(IL)) return this.derive(index + 1);
+      if (!lib.isPrivate(IL)) return this.derive(index + 1);
 
       // Private parent key -> private child key
       let hd: BIP32Interface;
       if (!this.isNeutered()) {
         // ki = parse256(IL) + kpar (mod n)
-        const ki = ecc.privateAdd(this.privateKey!, IL)!;
+        const ki = lib.privateAdd(this.privateKey!, IL)!;
 
         // In case ki == 0, proceed with the next value for i
         if (ki == null) return this.derive(index + 1);
@@ -351,7 +314,7 @@ export function BIP32Factory(ecc: TinySecp256k1Interface): BIP32API {
       } else {
         // Ki = point(parse256(IL)) + Kpar
         //    = G*IL + Kpar
-        const Ki = ecc.pointAddScalar(this.publicKey, IL, true)!;
+        const Ki = lib.pointAddScalar(this.publicKey, IL, true)!;
 
         // In case Ki is the point at infinity, proceed with the next value for i
         if (Ki === null) return this.derive(index + 1);
@@ -399,16 +362,16 @@ export function BIP32Factory(ecc: TinySecp256k1Interface): BIP32API {
       }, this as BIP32Interface);
     }
 
-    tweak(t: Uint8ArrayOrBuffer): Signer {
+    tweak(t: Uint8Array): Signer {
       if (this.privateKey) return this.tweakFromPrivateKey(t);
       return this.tweakFromPublicKey(t);
     }
 
-    private tweakFromPublicKey(t: Uint8ArrayOrBuffer): Signer {
+    private tweakFromPublicKey(t: Uint8Array): Signer {
       const xOnlyPubKey = toXOnly(this.publicKey);
-      if (!ecc.xOnlyPointAddTweak)
+      if (!lib.xOnlyPointAddTweak)
         throw new Error('xOnlyPointAddTweak not supported by ecc library');
-      const tweakedPublicKey = ecc.xOnlyPointAddTweak(xOnlyPubKey, t);
+      const tweakedPublicKey = lib.xOnlyPointAddTweak(xOnlyPubKey, t);
       if (!tweakedPublicKey || tweakedPublicKey.xOnlyPubkey === null)
         throw new Error('Cannot tweak public key!');
       const parityByte = Uint8Array.from([
@@ -422,17 +385,17 @@ export function BIP32Factory(ecc: TinySecp256k1Interface): BIP32API {
       return new Bip32Signer(undefined, tweakedPublicKeyCompresed);
     }
 
-    private tweakFromPrivateKey(t: Uint8ArrayOrBuffer): Signer {
+    private tweakFromPrivateKey(t: Uint8Array): Signer {
       const hasOddY =
         this.publicKey[0] === 3 ||
         (this.publicKey[0] === 4 && (this.publicKey[64] & 1) === 1);
       const privateKey = (() => {
         if (!hasOddY) return this.privateKey;
-        else if (!ecc.privateNegate)
+        else if (!lib.privateNegate)
           throw new Error('privateNegate not supported by ecc library');
-        else return ecc.privateNegate(this.privateKey!);
+        else return lib.privateNegate(this.privateKey!);
       })();
-      const tweakedPrivateKey = ecc.privateAdd(privateKey!, t);
+      const tweakedPrivateKey = lib.privateAdd(privateKey!, t);
       if (!tweakedPrivateKey) throw new Error('Invalid tweaked private key!');
 
       return new Bip32Signer(tweakedPrivateKey, undefined);
@@ -500,16 +463,16 @@ export function BIP32Factory(ecc: TinySecp256k1Interface): BIP32API {
   }
 
   function fromPrivateKey(
-    privateKey: Uint8ArrayOrBuffer,
-    chainCode: Uint8ArrayOrBuffer,
+    privateKey: Uint8Array,
+    chainCode: Uint8Array,
     network?: Network,
   ): BIP32Interface {
     return fromPrivateKeyLocal(privateKey, chainCode, network);
   }
 
   function fromPrivateKeyLocal(
-    privateKey: Uint8ArrayOrBuffer,
-    chainCode: Uint8ArrayOrBuffer,
+    privateKey: Uint8Array,
+    chainCode: Uint8Array,
     network?: Network,
     depth?: number,
     index?: number,
@@ -520,7 +483,7 @@ export function BIP32Factory(ecc: TinySecp256k1Interface): BIP32API {
 
     network = network || BITCOIN;
 
-    if (!ecc.isPrivate(privateKey))
+    if (!lib.isPrivate(privateKey))
       throw new TypeError('Private key not in range [1, n)');
     return new BIP32(
       privateKey,
@@ -534,16 +497,16 @@ export function BIP32Factory(ecc: TinySecp256k1Interface): BIP32API {
   }
 
   function fromPublicKey(
-    publicKey: Uint8ArrayOrBuffer,
-    chainCode: Uint8ArrayOrBuffer,
+    publicKey: Uint8Array,
+    chainCode: Uint8Array,
     network?: Network,
   ): BIP32Interface {
     return fromPublicKeyLocal(publicKey, chainCode, network);
   }
 
   function fromPublicKeyLocal(
-    publicKey: Uint8ArrayOrBuffer,
-    chainCode: Uint8ArrayOrBuffer,
+    publicKey: Uint8Array,
+    chainCode: Uint8Array,
     network?: Network,
     depth?: number,
     index?: number,
@@ -555,7 +518,7 @@ export function BIP32Factory(ecc: TinySecp256k1Interface): BIP32API {
     network = network || BITCOIN;
 
     // verify the X coordinate is a point on the curve
-    if (!ecc.isPoint(publicKey))
+    if (!lib.isPoint(publicKey))
       throw new TypeError('Point is not on the curve');
     return new BIP32(
       undefined,
@@ -568,10 +531,7 @@ export function BIP32Factory(ecc: TinySecp256k1Interface): BIP32API {
     );
   }
 
-  function fromSeed(
-    seed: Uint8ArrayOrBuffer,
-    network?: Network,
-  ): BIP32Interface {
+  function fromSeed(seed: Uint8Array, network?: Network): BIP32Interface {
     v.parse(v.instance(Uint8Array), seed);
     if (seed.length < 16)
       throw new TypeError('Seed should be at least 128 bits');
