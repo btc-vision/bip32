@@ -103,7 +103,7 @@ validAll.forEach((ff) => {
 it('invalid ecc library throws', () => {
   expect(() => {
     BIP32Creator({ isPoint: () => false })
-  }).toThrow(/ecc library invalid/)
+  }).toThrow(/verifyCryptoBackend/)
   // Run with no schnorr and check it doesn't throw
   BIP32Creator({ ...ecc, signSchnorr: null, verifySchnorr: null })
 })
@@ -275,16 +275,12 @@ it('ecdsa - no schnorr', () => {
   expect(() => signer.verifySchnorr(hash)).toThrow(/verifySchnorr not supported by ecc library/)
 })
 
-it('ecc without tweak support', () => {
-  let seed = Buffer.alloc(32, 1)
-  const tweak = Buffer.alloc(32, 3)
-
-  const bip32NoTweak = BIP32Creator({ ...ecc, xOnlyPointAddTweak: null, privateNegate: null })
-  const node = bip32NoTweak.fromSeed(seed)
-  const nodeWithoutPrivKey = bip32NoTweak.fromPublicKey(node.publicKey, node.chainCode)
-
-  expect(() => node.tweak(tweak)).toThrow(/privateNegate not supported by ecc library/)
-  expect(() => nodeWithoutPrivKey.tweak(tweak)).toThrow(/xOnlyPointAddTweak not supported by ecc library/)
+it('ecc without tweak support is rejected at validation time', () => {
+  // verifyCryptoBackend now requires privateNegate and xOnlyPointAddTweak,
+  // so a backend missing them is rejected at factory creation.
+  expect(() => {
+    BIP32Creator({ ...ecc, xOnlyPointAddTweak: null, privateNegate: null })
+  }).toThrow()
 })
 
 it('tweak', () => {

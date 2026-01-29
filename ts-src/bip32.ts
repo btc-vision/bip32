@@ -22,7 +22,7 @@ import type {
   PublicKey,
   SchnorrSignature,
   Signature,
-  TinySecp256k1Interface as EcpairTinySecp256k1Interface,
+  TinySecp256k1Interface,
   UniversalSigner,
   XOnlyPublicKey,
 } from '@btc-vision/ecpair';
@@ -36,17 +36,7 @@ const bs58check = {
 const BITCOIN_SEED = tools.fromUtf8('Bitcoin seed');
 const testedLibs = new WeakSet<object>();
 
-/**
- * Extends ecpair's TinySecp256k1Interface to require pointAddScalar,
- * which bip32 key derivation needs unconditionally.
- */
-export interface TinySecp256k1Interface extends EcpairTinySecp256k1Interface {
-  pointAddScalar(
-    p: Uint8Array,
-    tweak: Uint8Array,
-    compressed?: boolean,
-  ): Uint8Array | null;
-}
+export type { TinySecp256k1Interface } from '@btc-vision/ecpair';
 
 export interface BIP32Interface extends UniversalSigner {
   chainCode: Uint8Array;
