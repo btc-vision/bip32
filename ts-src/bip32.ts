@@ -1,16 +1,13 @@
 import * as crypto from './crypto.js';
 import { testEcc } from './testecc.js';
-import { base58check } from '@scure/base';
-import { sha256 } from '@noble/hashes/sha2.js';
-import * as v from 'valibot';
+import * as bs58check from '@btc-vision/bs58check';
 import type { Network } from './types.js';
 import {
-  Bip32PathSchema,
-  Buffer256Bit,
-  Buffer33Bytes,
-  NetworkSchema,
+  validateBip32Path,
+  validateBuffer256Bit,
+  validateBuffer33Bytes,
 } from './types.js';
-import * as wif from 'wif';
+import * as wif from '@btc-vision/wif';
 import * as tools from 'uint8array-tools';
 import { BITCOIN } from './networks.js';
 import { SignerCapability } from '@btc-vision/ecpair';
@@ -22,21 +19,25 @@ import type {
   PublicKey,
   SchnorrSignature,
   Signature,
-  TinySecp256k1Interface,
+  TinySecp256k1Interface as EcpairTinySecp256k1Interface,
   UniversalSigner,
   XOnlyPublicKey,
 } from '@btc-vision/ecpair';
 
-const _bs58check = base58check(sha256);
-const bs58check = {
-  encode: (data: Uint8Array): string => _bs58check.encode(data),
-  decode: (str: string): Uint8Array => _bs58check.decode(str),
-};
-
 const BITCOIN_SEED = tools.fromUtf8('Bitcoin seed');
 const testedLibs = new WeakSet<object>();
 
-export type { TinySecp256k1Interface } from '@btc-vision/ecpair';
+/**
+ * Extends ecpair's TinySecp256k1Interface to require pointAddScalar,
+ * which bip32 key derivation needs unconditionally.
+ */
+export interface TinySecp256k1Interface extends EcpairTinySecp256k1Interface {
+  pointAddScalar(
+    p: Uint8Array,
+    tweak: Uint8Array,
+    compressed?: boolean,
+  ): Uint8Array | null;
+}
 
 export interface BIP32Interface extends UniversalSigner {
   chainCode: Uint8Array;
@@ -426,7 +427,7 @@ export function BIP32Factory(
     }
 
     derivePath(path: string): BIP32Interface {
-      v.parse(Bip32PathSchema, path);
+      validateBip32Path(path);
 
       let splitPath = path.split('/');
       if (splitPath[0] === 'm') {
@@ -525,11 +526,10 @@ export function BIP32Factory(
     index?: number,
     parentFingerprint?: number,
   ): BIP32Interface {
-    v.parse(Buffer256Bit, privateKey);
-    v.parse(Buffer256Bit, chainCode);
+    validateBuffer256Bit(privateKey);
+    validateBuffer256Bit(chainCode);
 
     network = network || BITCOIN;
-    v.parse(NetworkSchema, network);
 
     if (!lib.isPrivate(privateKey))
       throw new TypeError('Private key not in range [1, n)');
@@ -560,11 +560,10 @@ export function BIP32Factory(
     index?: number,
     parentFingerprint?: number,
   ): BIP32Interface {
-    v.parse(Buffer33Bytes, publicKey);
-    v.parse(Buffer256Bit, chainCode);
+    validateBuffer33Bytes(publicKey);
+    validateBuffer256Bit(chainCode);
 
     network = network || BITCOIN;
-    v.parse(NetworkSchema, network);
 
     // verify the X coordinate is a point on the curve
     if (!lib.isPoint(publicKey))

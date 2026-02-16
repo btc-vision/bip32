@@ -8,14 +8,7 @@ import {
 } from '../src/esm/index.js';
 import { describe, it, expect, beforeAll } from 'vitest';
 import * as tools from 'uint8array-tools';
-import { base58check } from '@scure/base';
-import { sha256 } from '@noble/hashes/sha2.js';
-
-const _bs58check = base58check(sha256);
-const bs58check = {
-  encode: (data) => _bs58check.encode(data),
-  decode: (str) => _bs58check.decode(str),
-};
+import * as bs58check from '@btc-vision/bs58check';
 
 const SEED = tools.fromHex('000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f');
 

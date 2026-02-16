@@ -103,7 +103,7 @@ validAll.forEach((ff) => {
 it('invalid ecc library throws', () => {
   expect(() => {
     BIP32Creator({ isPoint: () => false })
-  }).toThrow(/verifyCryptoBackend/)
+  }).toThrow(/ecc library invalid/)
   // Run with no schnorr and check it doesn't throw
   BIP32Creator({ ...ecc, signSchnorr: null, verifySchnorr: null })
 })
@@ -187,12 +187,9 @@ describe('throws on wrong types', () => {
 
   invalid.derivePath.forEach((fx) => {
     it(`derivePath(${fx.derivationPath})`, () => {
-      const expected = fx.exception.replace(/^ValiError: /, '')
-      // Extract the error category (e.g., "Invalid type" or "Invalid format")
-      const errorCategory = expected.match(/^(Invalid \w+)/)[1]
       expect(() => {
         master.derivePath(fx.derivationPath)
-      }).toThrow(errorCategory)
+      }).toThrow(fx.exception)
     })
   })
 
@@ -201,7 +198,7 @@ describe('throws on wrong types', () => {
 
     expect(() => {
       BIP32.fromPrivateKey(Buffer.alloc(2), ONES)
-    }).toThrow(/Invalid length: Expected 32 but received 2/)
+    }).toThrow('Expected Uint8Array of length 32')
   })
 
   it('fromPrivateKey with zero key', () => {
@@ -275,12 +272,16 @@ it('ecdsa - no schnorr', () => {
   expect(() => signer.verifySchnorr(hash)).toThrow(/verifySchnorr not supported by ecc library/)
 })
 
-it('ecc without tweak support is rejected at validation time', () => {
-  // verifyCryptoBackend now requires privateNegate and xOnlyPointAddTweak,
-  // so a backend missing them is rejected at factory creation.
-  expect(() => {
-    BIP32Creator({ ...ecc, xOnlyPointAddTweak: null, privateNegate: null })
-  }).toThrow()
+it('ecc without tweak support', () => {
+  let seed = Buffer.alloc(32, 1)
+  const tweak = Buffer.alloc(32, 3)
+
+  const bip32NoTweak = BIP32Creator({ ...ecc, xOnlyPointAddTweak: null, privateNegate: null })
+  const node = bip32NoTweak.fromSeed(seed)
+  const nodeWithoutPrivKey = bip32NoTweak.fromPublicKey(node.publicKey, node.chainCode)
+
+  expect(() => node.tweak(tweak)).toThrow(/privateNegate not supported by ecc library/)
+  expect(() => nodeWithoutPrivKey.tweak(tweak)).toThrow(/xOnlyPointAddTweak not supported by ecc library/)
 })
 
 it('tweak', () => {

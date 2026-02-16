@@ -1,18 +1,11 @@
 import * as crypto from './crypto.js';
 import { testEcc } from './testecc.js';
-import { base58check } from '@scure/base';
-import { sha256 } from '@noble/hashes/sha2.js';
-import * as v from 'valibot';
-import { Bip32PathSchema, Buffer256Bit, Buffer33Bytes, NetworkSchema, } from './types.js';
-import * as wif from 'wif';
+import * as bs58check from '@btc-vision/bs58check';
+import { validateBip32Path, validateBuffer256Bit, validateBuffer33Bytes, } from './types.js';
+import * as wif from '@btc-vision/wif';
 import * as tools from 'uint8array-tools';
 import { BITCOIN } from './networks.js';
 import { SignerCapability } from '@btc-vision/ecpair';
-const _bs58check = base58check(sha256);
-const bs58check = {
-    encode: (data) => _bs58check.encode(data),
-    decode: (str) => _bs58check.decode(str),
-};
 const BITCOIN_SEED = tools.fromUtf8('Bitcoin seed');
 const testedLibs = new WeakSet();
 /**
@@ -290,7 +283,7 @@ export function BIP32Factory(ecc) {
             return this.derive(index + HIGHEST_BIT);
         }
         derivePath(path) {
-            v.parse(Bip32PathSchema, path);
+            validateBip32Path(path);
             let splitPath = path.split('/');
             if (splitPath[0] === 'm') {
                 if (this.parentFingerprint)
@@ -353,10 +346,9 @@ export function BIP32Factory(ecc) {
         return fromPrivateKeyLocal(privateKey, chainCode, network);
     }
     function fromPrivateKeyLocal(privateKey, chainCode, network, depth, index, parentFingerprint) {
-        v.parse(Buffer256Bit, privateKey);
-        v.parse(Buffer256Bit, chainCode);
+        validateBuffer256Bit(privateKey);
+        validateBuffer256Bit(chainCode);
         network = network || BITCOIN;
-        v.parse(NetworkSchema, network);
         if (!lib.isPrivate(privateKey))
             throw new TypeError('Private key not in range [1, n)');
         return new BIP32(privateKey, undefined, chainCode, network, depth, index, parentFingerprint);
@@ -365,10 +357,9 @@ export function BIP32Factory(ecc) {
         return fromPublicKeyLocal(publicKey, chainCode, network);
     }
     function fromPublicKeyLocal(publicKey, chainCode, network, depth, index, parentFingerprint) {
-        v.parse(Buffer33Bytes, publicKey);
-        v.parse(Buffer256Bit, chainCode);
+        validateBuffer33Bytes(publicKey);
+        validateBuffer256Bit(chainCode);
         network = network || BITCOIN;
-        v.parse(NetworkSchema, network);
         // verify the X coordinate is a point on the curve
         if (!lib.isPoint(publicKey))
             throw new TypeError('Point is not on the curve');
