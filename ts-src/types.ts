@@ -1,5 +1,3 @@
-export type { Network, Bip32Versions as Bip32 } from '@btc-vision/ecpair';
-
 const BIP32_PATH_REGEX = /^(m\/)?(\d+'?\/)*\d+'?$/;
 
 export function validateBip32Path(path: string): void {

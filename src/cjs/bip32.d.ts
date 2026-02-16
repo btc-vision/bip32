@@ -1,4 +1,4 @@
-import type { Network } from './types.js';
+import type { Network } from '@btc-vision/ecpair';
 import type { CryptoBackend, TinySecp256k1Interface as EcpairTinySecp256k1Interface, UniversalSigner } from '@btc-vision/ecpair';
 /**
  * Extends ecpair's TinySecp256k1Interface to require pointAddScalar,

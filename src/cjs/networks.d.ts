@@ -1,4 +1,4 @@
-import { Network } from './types.js';
+import type { Network } from '@btc-vision/ecpair';
 /**
  * Bitcoin mainnet network configuration
  */

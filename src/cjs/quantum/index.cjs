@@ -39,7 +39,7 @@
  * ```
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getBitcoinPath = exports.getQuantumPath = exports.QuantumDerivationPath = exports.DerivationPath = exports.getMLDSAConfig = exports.DEFAULT_SECURITY_LEVEL = exports.MLDSASecurityLevel = exports.QuantumBIP32Factory = void 0;
+exports.getMLDSAConfig = exports.DEFAULT_SECURITY_LEVEL = exports.MLDSASecurityLevel = exports.QuantumBIP32Factory = void 0;
 // Export the generic ML-DSA implementation (supports 44, 65, 87)
 var mldsa_js_1 = require("./mldsa.cjs");
 Object.defineProperty(exports, "QuantumBIP32Factory", { enumerable: true, get: function () { return mldsa_js_1.QuantumBIP32Factory; } });
@@ -47,9 +47,3 @@ var config_js_1 = require("./config.cjs");
 Object.defineProperty(exports, "MLDSASecurityLevel", { enumerable: true, get: function () { return config_js_1.MLDSASecurityLevel; } });
 Object.defineProperty(exports, "DEFAULT_SECURITY_LEVEL", { enumerable: true, get: function () { return config_js_1.DEFAULT_SECURITY_LEVEL; } });
 Object.defineProperty(exports, "getMLDSAConfig", { enumerable: true, get: function () { return config_js_1.getMLDSAConfig; } });
-// Re-export derivation path enums for convenience
-var derivation_paths_js_1 = require("../derivation-paths.cjs");
-Object.defineProperty(exports, "DerivationPath", { enumerable: true, get: function () { return derivation_paths_js_1.DerivationPath; } });
-Object.defineProperty(exports, "QuantumDerivationPath", { enumerable: true, get: function () { return derivation_paths_js_1.QuantumDerivationPath; } });
-Object.defineProperty(exports, "getQuantumPath", { enumerable: true, get: function () { return derivation_paths_js_1.getQuantumPath; } });
-Object.defineProperty(exports, "getBitcoinPath", { enumerable: true, get: function () { return derivation_paths_js_1.getBitcoinPath; } });

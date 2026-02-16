@@ -1,10 +1,8 @@
 import { randomBytes } from '@btc-vision/post-quantum/utils.js';
 import * as crypto from '../crypto.js';
 import * as tools from 'uint8array-tools';
-import {
-  validateBip32Path,
-  Network,
-} from '../types.js';
+import { validateBip32Path } from '../types.js';
+import type { Network } from '@btc-vision/ecpair';
 import {
   QuantumBIP32API,
   QuantumBIP32Interface,

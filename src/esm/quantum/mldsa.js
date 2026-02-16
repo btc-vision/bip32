@@ -1,7 +1,7 @@
 import { randomBytes } from '@btc-vision/post-quantum/utils.js';
 import * as crypto from '../crypto.js';
 import * as tools from 'uint8array-tools';
-import { validateBip32Path, } from '../types.js';
+import { validateBip32Path } from '../types.js';
 import * as bs58check from '@btc-vision/bs58check';
 import { findNetworkByVersion, getMLDSAConfig, MLDSASecurityLevel, } from './config.js';
 import { BITCOIN as DEFAULT_NETWORK } from '../networks.js';

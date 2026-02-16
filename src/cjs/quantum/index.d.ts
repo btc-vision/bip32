@@ -40,4 +40,3 @@
 export { QuantumBIP32Factory } from './mldsa.js';
 export { QuantumBIP32Interface, QuantumBIP32API, QuantumSigner, MLDSAKeyPair, } from './types.js';
 export { MLDSASecurityLevel, MLDSAConfig, DEFAULT_SECURITY_LEVEL, getMLDSAConfig, } from './config.js';
-export { DerivationPath, QuantumDerivationPath, getQuantumPath, getBitcoinPath, } from '../derivation-paths.js';

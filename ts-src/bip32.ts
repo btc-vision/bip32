@@ -1,7 +1,7 @@
 import * as crypto from './crypto.js';
 import { testEcc } from './testecc.js';
 import * as bs58check from '@btc-vision/bs58check';
-import type { Network } from './types.js';
+import type { Network } from '@btc-vision/ecpair';
 import {
   validateBip32Path,
   validateBuffer256Bit,
