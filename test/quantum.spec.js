@@ -636,3 +636,117 @@ describe('QuantumBIP32 network support', () => {
     expect(b58_main87).not.toBe(b58_test44);
   });
 });
+
+describe('QuantumBIP32 fromBase58 LEVEL3 round-trip', () => {
+  it('private key round-trip for LEVEL3', () => {
+    const b58 = masterLevel3.toBase58();
+    const imported = QuantumBIP32Factory.fromBase58(b58);
+
+    expect(imported.securityLevel).toBe(MLDSASecurityLevel.LEVEL3);
+    expect(tools.toHex(imported.privateKey)).toBe(tools.toHex(masterLevel3.privateKey));
+    expect(tools.toHex(imported.publicKey)).toBe(tools.toHex(masterLevel3.publicKey));
+    expect(imported.isNeutered()).toBe(false);
+  });
+
+  it('public key round-trip for LEVEL3', () => {
+    const neutered = masterLevel3.neutered();
+    const b58 = neutered.toBase58();
+    const imported = QuantumBIP32Factory.fromBase58(b58);
+
+    expect(imported.securityLevel).toBe(MLDSASecurityLevel.LEVEL3);
+    expect(tools.toHex(imported.publicKey)).toBe(tools.toHex(masterLevel3.publicKey));
+    expect(imported.isNeutered()).toBe(true);
+    expect(imported.privateKey).toBe(undefined);
+  });
+
+  it('public key round-trip for LEVEL5', () => {
+    const neutered = masterLevel5.neutered();
+    const b58 = neutered.toBase58();
+    const imported = QuantumBIP32Factory.fromBase58(b58);
+
+    expect(imported.securityLevel).toBe(MLDSASecurityLevel.LEVEL5);
+    expect(tools.toHex(imported.publicKey)).toBe(tools.toHex(masterLevel5.publicKey));
+    expect(imported.isNeutered()).toBe(true);
+  });
+});
+
+describe('QuantumBIP32Factory.fromKeyPair', () => {
+  it('creates key from private key, public key, and chain code', () => {
+    const key = QuantumBIP32Factory.fromKeyPair(
+      master.privateKey,
+      master.publicKey,
+      master.chainCode
+    );
+
+    expect(tools.toHex(key.privateKey)).toBe(tools.toHex(master.privateKey));
+    expect(tools.toHex(key.publicKey)).toBe(tools.toHex(master.publicKey));
+    expect(tools.toHex(key.chainCode)).toBe(tools.toHex(master.chainCode));
+    expect(key.isNeutered()).toBe(false);
+  });
+
+  it('throws on invalid private key length', () => {
+    expect(() => QuantumBIP32Factory.fromKeyPair(
+      new Uint8Array(100),
+      master.publicKey,
+      master.chainCode
+    )).toThrow(/Invalid private key length/);
+  });
+
+  it('throws on invalid public key length', () => {
+    expect(() => QuantumBIP32Factory.fromKeyPair(
+      master.privateKey,
+      new Uint8Array(100),
+      master.chainCode
+    )).toThrow(/Invalid public key length/);
+  });
+
+  it('throws on invalid chain code length', () => {
+    expect(() => QuantumBIP32Factory.fromKeyPair(
+      master.privateKey,
+      master.publicKey,
+      new Uint8Array(16)
+    )).toThrow(/Invalid chain code length/);
+  });
+});
+
+describe('QuantumBIP32Factory.fromPrecomputed', () => {
+  it('restores key with full hierarchy metadata', () => {
+    const child = master.derivePath("m/360'/0'/0'");
+    const restored = QuantumBIP32Factory.fromPrecomputed(
+      child.privateKey,
+      child.publicKey,
+      child.chainCode,
+      child.depth,
+      child.index,
+      child.parentFingerprint
+    );
+
+    expect(tools.toHex(restored.publicKey)).toBe(tools.toHex(child.publicKey));
+    expect(tools.toHex(restored.privateKey)).toBe(tools.toHex(child.privateKey));
+    expect(restored.depth).toBe(child.depth);
+    expect(restored.index).toBe(child.index);
+    expect(restored.parentFingerprint).toBe(child.parentFingerprint);
+    expect(restored.toBase58()).toBe(child.toBase58());
+  });
+
+  it('restores neutered key', () => {
+    const restored = QuantumBIP32Factory.fromPrecomputed(
+      undefined,
+      master.publicKey,
+      master.chainCode,
+      0,
+      0,
+      0
+    );
+
+    expect(restored.isNeutered()).toBe(true);
+    expect(tools.toHex(restored.publicKey)).toBe(tools.toHex(master.publicKey));
+  });
+});
+
+describe('QuantumBIP32 fromSeed type validation', () => {
+  it('throws on non-Uint8Array input', () => {
+    expect(() => QuantumBIP32Factory.fromSeed('not a buffer')).toThrow('Expected Uint8Array');
+    expect(() => QuantumBIP32Factory.fromSeed(123)).toThrow('Expected Uint8Array');
+  });
+});

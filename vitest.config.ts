@@ -10,7 +10,6 @@ export default defineConfig({
       include: ['src/esm/**/*.js'],
       exclude: [
         'src/esm/index.js',
-        'src/esm/Buffer.js',
         'src/esm/quantum/index.js',
         'src/esm/quantum/types.js',
       ],

@@ -6,13 +6,13 @@ export function validateBip32Path(path: string): void {
   }
 }
 
-export function validateBuffer256Bit(buf: Uint8Array): void {
+export function validateBytes32(buf: Uint8Array): void {
   if (!(buf instanceof Uint8Array) || buf.length !== 32) {
     throw new TypeError('Expected Uint8Array of length 32');
   }
 }
 
-export function validateBuffer33Bytes(buf: Uint8Array): void {
+export function validateBytes33(buf: Uint8Array): void {
   if (!(buf instanceof Uint8Array) || buf.length !== 33) {
     throw new TypeError('Expected Uint8Array of length 33');
   }

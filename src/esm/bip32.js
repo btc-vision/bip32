@@ -1,7 +1,7 @@
 import * as crypto from './crypto.js';
 import { testEcc } from './testecc.js';
 import * as bs58check from '@btc-vision/bs58check';
-import { validateBip32Path, validateBuffer256Bit, validateBuffer33Bytes, } from './types.js';
+import { validateBip32Path, validateBytes32, validateBytes33, } from './types.js';
 import * as wif from '@btc-vision/wif';
 import * as tools from 'uint8array-tools';
 import { BITCOIN } from './networks.js';
@@ -346,8 +346,8 @@ export function BIP32Factory(ecc) {
         return fromPrivateKeyLocal(privateKey, chainCode, network);
     }
     function fromPrivateKeyLocal(privateKey, chainCode, network, depth, index, parentFingerprint) {
-        validateBuffer256Bit(privateKey);
-        validateBuffer256Bit(chainCode);
+        validateBytes32(privateKey);
+        validateBytes32(chainCode);
         network = network || BITCOIN;
         if (!lib.isPrivate(privateKey))
             throw new TypeError('Private key not in range [1, n)');
@@ -357,8 +357,8 @@ export function BIP32Factory(ecc) {
         return fromPublicKeyLocal(publicKey, chainCode, network);
     }
     function fromPublicKeyLocal(publicKey, chainCode, network, depth, index, parentFingerprint) {
-        validateBuffer33Bytes(publicKey);
-        validateBuffer256Bit(chainCode);
+        validateBytes33(publicKey);
+        validateBytes32(chainCode);
         network = network || BITCOIN;
         // verify the X coordinate is a point on the curve
         if (!lib.isPoint(publicKey))
