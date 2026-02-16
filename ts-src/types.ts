@@ -1,48 +1,21 @@
-import * as v from 'valibot';
-
 export type { Network, Bip32Versions as Bip32 } from '@btc-vision/ecpair';
 
-export const Uint32Schema = v.pipe(
-  v.number(),
-  v.integer(),
-  v.minValue(0),
-  v.maxValue(0xffffffff),
-);
+const BIP32_PATH_REGEX = /^(m\/)?(\d+'?\/)*\d+'?$/;
 
-export const Uint31Schema = v.pipe(
-  v.number(),
-  v.integer(),
-  v.minValue(0),
-  v.maxValue(0x7fffffff),
-);
+export function validateBip32Path(path: string): void {
+  if (typeof path !== 'string' || !BIP32_PATH_REGEX.test(path)) {
+    throw new TypeError('Expected BIP32 derivation path');
+  }
+}
 
-const Uint8Schema = v.pipe(
-  v.number(),
-  v.integer(),
-  v.minValue(0),
-  v.maxValue(0xff),
-);
+export function validateBuffer256Bit(buf: Uint8Array): void {
+  if (!(buf instanceof Uint8Array) || buf.length !== 32) {
+    throw new TypeError('Expected Uint8Array of length 32');
+  }
+}
 
-export const Buffer256Bit = v.pipe(v.instance(Uint8Array), v.length(32));
-
-export const Buffer33Bytes = v.pipe(v.instance(Uint8Array), v.length(33));
-
-const Bip32Schema = v.object({
-  public: Uint32Schema,
-  private: Uint32Schema,
-});
-
-export const NetworkSchema = v.object({
-  wif: Uint8Schema,
-  bip32: Bip32Schema,
-  messagePrefix: v.union([v.string(), v.instance(Uint8Array)]),
-  bech32: v.string(),
-  bech32Opnet: v.optional(v.string()),
-  pubKeyHash: Uint8Schema,
-  scriptHash: Uint8Schema,
-});
-
-export const Bip32PathSchema = v.pipe(
-  v.string(),
-  v.regex(/^(m\/)?(\d+'?\/)*\d+'?$/),
-);
+export function validateBuffer33Bytes(buf: Uint8Array): void {
+  if (!(buf instanceof Uint8Array) || buf.length !== 33) {
+    throw new TypeError('Expected Uint8Array of length 33');
+  }
+}

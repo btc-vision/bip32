@@ -37,17 +37,10 @@ exports.QuantumBIP32Factory = void 0;
 const utils_js_1 = require("@btc-vision/post-quantum/utils.js");
 const crypto = __importStar(require("../crypto.cjs"));
 const tools = __importStar(require("uint8array-tools"));
-const v = __importStar(require("valibot"));
 const types_js_1 = require("../types.cjs");
-const base_1 = require("@scure/base");
-const sha2_js_1 = require("@noble/hashes/sha2.js");
+const bs58check = __importStar(require("@btc-vision/bs58check"));
 const config_js_1 = require("./config.cjs");
 const networks_js_1 = require("../networks.cjs");
-const _bs58check = (0, base_1.base58check)(sha2_js_1.sha256);
-const bs58check = {
-    encode: (data) => _bs58check.encode(data),
-    decode: (str) => _bs58check.decode(str),
-};
 const CHAIN_CODE_SIZE = 32;
 const HIGHEST_BIT = 0x80000000;
 const BITCOIN_SEED = tools.fromUtf8('Bitcoin seed');
@@ -223,7 +216,7 @@ class QuantumBIP32 extends QuantumBip32Signer {
         return this.derive(index + HIGHEST_BIT);
     }
     derivePath(path) {
-        v.parse(types_js_1.Bip32PathSchema, path);
+        (0, types_js_1.validateBip32Path)(path);
         let splitPath = path.split('/');
         if (splitPath[0] === 'm') {
             if (this.parentFingerprint) {

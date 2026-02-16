@@ -36,19 +36,12 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.BIP32Factory = BIP32Factory;
 const crypto = __importStar(require("./crypto.cjs"));
 const testecc_js_1 = require("./testecc.cjs");
-const base_1 = require("@scure/base");
-const sha2_js_1 = require("@noble/hashes/sha2.js");
-const v = __importStar(require("valibot"));
+const bs58check = __importStar(require("@btc-vision/bs58check"));
 const types_js_1 = require("./types.cjs");
-const wif = __importStar(require("wif"));
+const wif = __importStar(require("@btc-vision/wif"));
 const tools = __importStar(require("uint8array-tools"));
 const networks_js_1 = require("./networks.cjs");
 const ecpair_1 = require("@btc-vision/ecpair");
-const _bs58check = (0, base_1.base58check)(sha2_js_1.sha256);
-const bs58check = {
-    encode: (data) => _bs58check.encode(data),
-    decode: (str) => _bs58check.decode(str),
-};
 const BITCOIN_SEED = tools.fromUtf8('Bitcoin seed');
 const testedLibs = new WeakSet();
 /**
@@ -326,7 +319,7 @@ function BIP32Factory(ecc) {
             return this.derive(index + HIGHEST_BIT);
         }
         derivePath(path) {
-            v.parse(types_js_1.Bip32PathSchema, path);
+            (0, types_js_1.validateBip32Path)(path);
             let splitPath = path.split('/');
             if (splitPath[0] === 'm') {
                 if (this.parentFingerprint)
@@ -389,10 +382,9 @@ function BIP32Factory(ecc) {
         return fromPrivateKeyLocal(privateKey, chainCode, network);
     }
     function fromPrivateKeyLocal(privateKey, chainCode, network, depth, index, parentFingerprint) {
-        v.parse(types_js_1.Buffer256Bit, privateKey);
-        v.parse(types_js_1.Buffer256Bit, chainCode);
+        (0, types_js_1.validateBuffer256Bit)(privateKey);
+        (0, types_js_1.validateBuffer256Bit)(chainCode);
         network = network || networks_js_1.BITCOIN;
-        v.parse(types_js_1.NetworkSchema, network);
         if (!lib.isPrivate(privateKey))
             throw new TypeError('Private key not in range [1, n)');
         return new BIP32(privateKey, undefined, chainCode, network, depth, index, parentFingerprint);
@@ -401,10 +393,9 @@ function BIP32Factory(ecc) {
         return fromPublicKeyLocal(publicKey, chainCode, network);
     }
     function fromPublicKeyLocal(publicKey, chainCode, network, depth, index, parentFingerprint) {
-        v.parse(types_js_1.Buffer33Bytes, publicKey);
-        v.parse(types_js_1.Buffer256Bit, chainCode);
+        (0, types_js_1.validateBuffer33Bytes)(publicKey);
+        (0, types_js_1.validateBuffer256Bit)(chainCode);
         network = network || networks_js_1.BITCOIN;
-        v.parse(types_js_1.NetworkSchema, network);
         // verify the X coordinate is a point on the curve
         if (!lib.isPoint(publicKey))
             throw new TypeError('Point is not on the curve');

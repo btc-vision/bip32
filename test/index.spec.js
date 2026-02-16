@@ -187,12 +187,9 @@ describe('throws on wrong types', () => {
 
   invalid.derivePath.forEach((fx) => {
     it(`derivePath(${fx.derivationPath})`, () => {
-      const expected = fx.exception.replace(/^ValiError: /, '')
-      // Extract the error category (e.g., "Invalid type" or "Invalid format")
-      const errorCategory = expected.match(/^(Invalid \w+)/)[1]
       expect(() => {
         master.derivePath(fx.derivationPath)
-      }).toThrow(errorCategory)
+      }).toThrow(fx.exception)
     })
   })
 
@@ -201,7 +198,7 @@ describe('throws on wrong types', () => {
 
     expect(() => {
       BIP32.fromPrivateKey(Buffer.alloc(2), ONES)
-    }).toThrow(/Invalid length: Expected 32 but received 2/)
+    }).toThrow('Expected Uint8Array of length 32')
   })
 
   it('fromPrivateKey with zero key', () => {

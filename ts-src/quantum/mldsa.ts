@@ -1,9 +1,8 @@
 import { randomBytes } from '@btc-vision/post-quantum/utils.js';
 import * as crypto from '../crypto.js';
 import * as tools from 'uint8array-tools';
-import * as v from 'valibot';
 import {
-  Bip32PathSchema,
+  validateBip32Path,
   Network,
 } from '../types.js';
 import {
@@ -11,8 +10,7 @@ import {
   QuantumBIP32Interface,
   QuantumSigner,
 } from './types.js';
-import { base58check } from '@scure/base';
-import { sha256 } from '@noble/hashes/sha2.js';
+import * as bs58check from '@btc-vision/bs58check';
 import {
   findNetworkByVersion,
   getMLDSAConfig,
@@ -20,12 +18,6 @@ import {
   MLDSASecurityLevel,
 } from './config.js';
 import { BITCOIN as DEFAULT_NETWORK } from '../networks.js';
-
-const _bs58check = base58check(sha256);
-const bs58check = {
-  encode: (data: Uint8Array): string => _bs58check.encode(data),
-  decode: (str: string): Uint8Array => _bs58check.decode(str),
-};
 
 const CHAIN_CODE_SIZE = 32;
 const HIGHEST_BIT = 0x80000000;
@@ -253,7 +245,7 @@ class QuantumBIP32 extends QuantumBip32Signer implements QuantumBIP32Interface {
   }
 
   derivePath(path: string): QuantumBIP32Interface {
-    v.parse(Bip32PathSchema, path);
+    validateBip32Path(path);
 
     let splitPath = path.split('/');
     if (splitPath[0] === 'm') {
