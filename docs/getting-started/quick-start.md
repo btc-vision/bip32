@@ -10,10 +10,7 @@ import { BIP32Factory, BITCOIN } from '@btc-vision/bip32';
 const bip32 = BIP32Factory(createNobleBackend());
 
 // 2. Generate a master key from a seed
-const seed = Buffer.from(
-  '000102030405060708090a0b0c0d0e0f',
-  'hex',
-);
+const seed = Buffer.from('000102030405060708090a0b0c0d0e0f', 'hex');
 const master = bip32.fromSeed(seed);
 
 // 3. Derive child keys using a BIP44 path
@@ -26,7 +23,7 @@ console.log('WIF:', child.toWIF());
 console.log('Base58:', child.toBase58());
 
 // 5. Sign a message
-const hash = Buffer.alloc(32, 0x01);
+const hash = new Uint8Array(32).fill(0x01);
 const signature = child.sign(hash);
 const valid = child.verify(hash, signature);
 console.log('Signature valid:', valid);
@@ -75,8 +72,8 @@ const segwit = getBitcoinPath(84);      // m/84'/0'/0'/0/0
 const taproot = getBitcoinPath(86);     // m/86'/0'/0'/0/0
 const taproot2 = getBitcoinPath(86, 1); // m/86'/0'/1'/0/0 (account 1)
 
-// Quantum paths
-const quantum = getQuantumPath();         // m/360'/0'/0'/0/0
+// Quantum paths (4-component: purpose/account/change/addressIndex)
+const quantum = getQuantumPath();                // m/360'/0'/0'/0
 const quantumChange = getQuantumPath(0, 0, true); // m/360'/0'/1'/0
 ```
 

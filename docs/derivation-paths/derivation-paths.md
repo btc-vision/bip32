@@ -67,15 +67,15 @@ getBitcoinPath(
 ```typescript
 import { getBitcoinPath } from '@btc-vision/bip32';
 
-getBitcoinPath(84);           // "m/84'/0'/0'/0/0"
-getBitcoinPath(84, 1);        // "m/84'/0'/1'/0/0"
-getBitcoinPath(84, 0, 5);     // "m/84'/0'/0'/0/5"
-getBitcoinPath(84, 0, 0, true); // "m/84'/0'/0'/1/0"
+getBitcoinPath(84);              // "m/84'/0'/0'/0/0"
+getBitcoinPath(84, 1);           // "m/84'/0'/1'/0/0"
+getBitcoinPath(84, 0, 5);        // "m/84'/0'/0'/0/5"
+getBitcoinPath(84, 0, 0, true);  // "m/84'/0'/0'/1/0"
 ```
 
 ### getQuantumPath
 
-Generate a quantum (BIP360) derivation path.
+Generate a quantum (BIP360) derivation path. Returns a 4-component path: `m/360'/{account}'/{change}'/{addressIndex}`.
 
 ```typescript
 getQuantumPath(
@@ -94,18 +94,10 @@ getQuantumPath(
 ```typescript
 import { getQuantumPath } from '@btc-vision/bip32';
 
-getQuantumPath();               // "m/360'/0'/0'/0/0"
-getQuantumPath(1);              // "m/360'/1'/0'/0/0"
-getQuantumPath(0, 3);           // "m/360'/0'/0'/0/3"
+getQuantumPath();               // "m/360'/0'/0'/0"
+getQuantumPath(1);              // "m/360'/1'/0'/0"
+getQuantumPath(0, 3);           // "m/360'/0'/0'/3"
 getQuantumPath(0, 0, true);     // "m/360'/0'/1'/0"
-```
-
-## Types
-
-```typescript
-// Accepts both enum values and raw strings
-type DerivationPathType = DerivationPath | string;
-type QuantumDerivationPathType = QuantumDerivationPath | string;
 ```
 
 ---

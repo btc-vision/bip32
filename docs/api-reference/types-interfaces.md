@@ -8,13 +8,16 @@ All types exported from `@btc-vision/bip32`.
 
 ### Network
 
-Re-exported from `@btc-vision/ecpair`.
+Defined in `@btc-vision/ecpair`. Import directly from that package:
+
+```typescript
+import type { Network } from '@btc-vision/ecpair';
+```
 
 ```typescript
 interface Network {
   messagePrefix: string | Uint8Array;
   bech32: string;
-  bech32Opnet?: string;
   pubKeyHash: number;
   scriptHash: number;
   wif: number;
@@ -59,35 +62,13 @@ enum QuantumDerivationPath {
 }
 ```
 
-### DerivationPathType
-
-```typescript
-type DerivationPathType = DerivationPath | string;
-```
-
-### QuantumDerivationPathType
-
-```typescript
-type QuantumDerivationPathType = QuantumDerivationPath | string;
-```
-
 ---
 
 ## Signer Types
 
-Re-exported from `@btc-vision/ecpair`:
-
-### BIP32Signer
-
-```typescript
-type BIP32Signer = UniversalSigner;
-```
-
-Type alias for `UniversalSigner` from `@btc-vision/ecpair`. Used for backward compatibility.
+From `@btc-vision/ecpair`:
 
 ### UniversalSigner
-
-From `@btc-vision/ecpair`:
 
 ```typescript
 interface UniversalSigner {
@@ -121,44 +102,6 @@ From `@btc-vision/ecpair` — these are `Uint8Array` at runtime with branded typ
 | `Signature` | `Uint8Array` | ECDSA signature |
 | `SchnorrSignature` | `Uint8Array` | Schnorr signature |
 | `Bytes32` | `Uint8Array` | 32-byte buffer |
-
----
-
-## Buffer Type
-
-```typescript
-type Uint8ArrayOrBuffer = Uint8Array | Buffer;
-```
-
-Convenience type for accepting either `Uint8Array` or Node.js `Buffer`.
-
----
-
-## Validation Functions
-
-### validateBip32Path
-
-```typescript
-function validateBip32Path(path: string): void
-```
-
-Throws `TypeError` if `path` is not a valid BIP32 derivation path matching `^(m\/)?(\d+'?\/)*\d+'?$`.
-
-### validateBuffer256Bit
-
-```typescript
-function validateBuffer256Bit(buf: Uint8Array): void
-```
-
-Throws `TypeError` if `buf` is not a `Uint8Array` of length 32.
-
-### validateBuffer33Bytes
-
-```typescript
-function validateBuffer33Bytes(buf: Uint8Array): void
-```
-
-Throws `TypeError` if `buf` is not a `Uint8Array` of length 33.
 
 ---
 

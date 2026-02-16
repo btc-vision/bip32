@@ -64,7 +64,7 @@ const pubNode = bip32.fromBase58(xpub);
 ```
 
 **Validation:**
-- Buffer must decode to exactly 78 bytes
+- Decoded data must be exactly 78 bytes
 - Version bytes must match the network
 - Depth 0 keys must have zero parent fingerprint and index
 
@@ -89,8 +89,8 @@ fromPrivateKey(
 | `network` | `Network` | `BITCOIN` | Network configuration |
 
 ```typescript
-const privateKey = Buffer.alloc(32, 0x01);
-const chainCode = Buffer.alloc(32, 0x02);
+const privateKey = new Uint8Array(32).fill(0x01);
+const chainCode = new Uint8Array(32).fill(0x02);
 const node = bip32.fromPrivateKey(privateKey, chainCode);
 ```
 

@@ -58,7 +58,7 @@ Pass any object conforming to the `Network` type from `@btc-vision/ecpair`:
 
 ```typescript
 import { BIP32Factory } from '@btc-vision/bip32';
-import type { Network } from '@btc-vision/bip32';
+import type { Network } from '@btc-vision/ecpair';
 
 const LITECOIN: Network = {
   messagePrefix: '\x19Litecoin Signed Message:\n',
@@ -79,7 +79,7 @@ const wif = master.toWIF(); // Litecoin WIF format
 
 ## Network Type
 
-The `Network` type is re-exported from `@btc-vision/ecpair`:
+The `Network` type is defined in `@btc-vision/ecpair`:
 
 ```typescript
 interface Network {
