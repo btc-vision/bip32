@@ -38,7 +38,7 @@ console.log(child.toWIF());
 console.log(child.toBase58());
 
 // Sign and verify
-const hash = Buffer.alloc(32, 0x01);
+const hash = new Uint8Array(32).fill(0x01);
 const signature = child.sign(hash);
 console.log(child.verify(hash, signature)); // true
 ```
