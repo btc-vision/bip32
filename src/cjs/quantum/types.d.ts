@@ -1,5 +1,5 @@
 import { MLDSASecurityLevel } from './config.js';
-import { Network } from '../types.js';
+import type { Network } from '@btc-vision/ecpair';
 /**
  * ML-DSA key pair interface
  *

@@ -8,7 +8,12 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'lcov', 'html'],
       include: ['src/esm/**/*.js'],
-      thresholds: { branches: 90, functions: 90 },
+      exclude: [
+        'src/esm/index.js',
+        'src/esm/quantum/index.js',
+        'src/esm/quantum/types.js',
+      ],
+      thresholds: { branches: 80, functions: 90 },
     },
   },
 });

@@ -56,10 +56,3 @@ export {
   getMLDSAConfig,
 } from './config.js';
 
-// Re-export derivation path enums for convenience
-export {
-  DerivationPath,
-  QuantumDerivationPath,
-  getQuantumPath,
-  getBitcoinPath,
-} from '../derivation-paths.js';

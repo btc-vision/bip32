@@ -93,7 +93,7 @@ validAll.forEach((ff) => {
     verify(hd, false, ff, network)
 
     if (ff.seed) {
-      let seed = Buffer.from(ff.seed, 'hex')
+      let seed = tools.fromHex(ff.seed)
       hd = BIP32.fromSeed(seed, network)
       verify(hd, true, ff, network)
     }
@@ -150,7 +150,7 @@ it('works for Public -> public', () => {
 
   expect(c.base58).toBe(child.toBase58())
 
-  const hdNeutered = BIP32.fromPublicKey(Buffer.from(f.master.pubKey, 'hex'), Buffer.from(f.master.chainCode, 'hex'))
+  const hdNeutered = BIP32.fromPublicKey(tools.fromHex(f.master.pubKey), tools.fromHex(f.master.chainCode))
   expect(child.toBase58()).toBe(hdNeutered.derive(c.m).toBase58())
 })
 
@@ -194,16 +194,16 @@ describe('throws on wrong types', () => {
   })
 
   it('fromPrivateKey with invalid length', () => {
-    let ONES = Buffer.alloc(32, 1)
+    let ONES = new Uint8Array(32).fill(1)
 
     expect(() => {
-      BIP32.fromPrivateKey(Buffer.alloc(2), ONES)
+      BIP32.fromPrivateKey(new Uint8Array(2), ONES)
     }).toThrow('Expected Uint8Array of length 32')
   })
 
   it('fromPrivateKey with zero key', () => {
-    let ZERO = Buffer.alloc(32, 0)
-    let ONES = Buffer.alloc(32, 1)
+    let ZERO = new Uint8Array(32)
+    let ONES = new Uint8Array(32).fill(1)
 
     expect(() => {
       BIP32.fromPrivateKey(ZERO, ONES)
@@ -224,18 +224,18 @@ describe('fromSeed', () => {
   invalid.fromSeed.forEach((f) => {
     it(f.exception, () => {
       expect(() => {
-        BIP32.fromSeed(Buffer.from(f.seed, 'hex'))
+        BIP32.fromSeed(tools.fromHex(f.seed))
       }).toThrow(new RegExp(f.exception))
     })
   })
 })
 
 it('ecdsa', () => {
-  let seed = Buffer.alloc(32, 1)
-  let hash = Buffer.alloc(32, 2)
-  let signature = Buffer.from('9636ee2fac31b795a308856b821ebe297dda7b28220fb46ea1fbbd7285977cc04c82b734956246a0f15a9698f03f546d8d96fe006c8e7bd2256ca7c8229e6f5c', 'hex')
-  let schnorrsig = Buffer.from('17179c75363d03a9948b2738bbbf91c1eaf257bb6ef72c440419dee16e2777b74bb4fe5387579cb868fa1ace009b1f3db3f0ba7449aa3bd7a64d2868a2f603f1', 'hex')
-  let signatureLowR = Buffer.from('0587a40b391b76596c257bf59565b24eaff2cc42b45caa2640902e73fb97a6e702c3402ab89348a7dae1bf171c3e172fa60353d7b01621a94cb7caca59b995db', 'hex')
+  let seed = new Uint8Array(32).fill(1)
+  let hash = new Uint8Array(32).fill(2)
+  let signature = tools.fromHex('9636ee2fac31b795a308856b821ebe297dda7b28220fb46ea1fbbd7285977cc04c82b734956246a0f15a9698f03f546d8d96fe006c8e7bd2256ca7c8229e6f5c')
+  let schnorrsig = tools.fromHex('17179c75363d03a9948b2738bbbf91c1eaf257bb6ef72c440419dee16e2777b74bb4fe5387579cb868fa1ace009b1f3db3f0ba7449aa3bd7a64d2868a2f603f1')
+  let signatureLowR = tools.fromHex('0587a40b391b76596c257bf59565b24eaff2cc42b45caa2640902e73fb97a6e702c3402ab89348a7dae1bf171c3e172fa60353d7b01621a94cb7caca59b995db')
   let node = BIP32.fromSeed(seed)
 
   expect(tools.toHex(node.sign(hash))).toBe(tools.toHex(signature))
@@ -254,9 +254,9 @@ it('ecdsa', () => {
 })
 
 it('ecdsa - no schnorr', () => {
-  let seed = Buffer.alloc(32, 1)
-  let hash = Buffer.alloc(32, 2)
-  const tweak = Buffer.alloc(32, 3)
+  let seed = new Uint8Array(32).fill(1)
+  let hash = new Uint8Array(32).fill(2)
+  const tweak = new Uint8Array(32).fill(3)
 
   const bip32NoSchnorr = BIP32Creator({ ...ecc, signSchnorr: null, verifySchnorr: null })
   const node = bip32NoSchnorr.fromSeed(seed)
@@ -273,8 +273,8 @@ it('ecdsa - no schnorr', () => {
 })
 
 it('ecc without tweak support', () => {
-  let seed = Buffer.alloc(32, 1)
-  const tweak = Buffer.alloc(32, 3)
+  let seed = new Uint8Array(32).fill(1)
+  const tweak = new Uint8Array(32).fill(3)
 
   const bip32NoTweak = BIP32Creator({ ...ecc, xOnlyPointAddTweak: null, privateNegate: null })
   const node = bip32NoTweak.fromSeed(seed)
@@ -285,12 +285,12 @@ it('ecc without tweak support', () => {
 })
 
 it('tweak', () => {
-  const seed = Buffer.alloc(32, 1)
-  const hash = Buffer.alloc(32, 2)
-  const tweak = Buffer.alloc(32, 3)
-  const signature = Buffer.from('5a38c6652feb5166c9c91cfa5fa4a4c7cec27445d4619499df8afdd05ebc823246d644b0c7d3b960625393df537f900528ec4b14e6ddab8fd0c7e87c98cfe9d0', 'hex')
-  const schnorrsig = Buffer.from('f9d65ae90d7f6774a8c51e52147ceb664741755d1cab4a5c5f529a6a8b6a7d71e9a49ad008bef95b2185b60126f654e2382c5eaa71a76ddd08eb397c90658484', 'hex')
-  const signatureLowR = Buffer.from('5a38c6652feb5166c9c91cfa5fa4a4c7cec27445d4619499df8afdd05ebc823246d644b0c7d3b960625393df537f900528ec4b14e6ddab8fd0c7e87c98cfe9d0', 'hex')
+  const seed = new Uint8Array(32).fill(1)
+  const hash = new Uint8Array(32).fill(2)
+  const tweak = new Uint8Array(32).fill(3)
+  const signature = tools.fromHex('5a38c6652feb5166c9c91cfa5fa4a4c7cec27445d4619499df8afdd05ebc823246d644b0c7d3b960625393df537f900528ec4b14e6ddab8fd0c7e87c98cfe9d0')
+  const schnorrsig = tools.fromHex('f9d65ae90d7f6774a8c51e52147ceb664741755d1cab4a5c5f529a6a8b6a7d71e9a49ad008bef95b2185b60126f654e2382c5eaa71a76ddd08eb397c90658484')
+  const signatureLowR = tools.fromHex('5a38c6652feb5166c9c91cfa5fa4a4c7cec27445d4619499df8afdd05ebc823246d644b0c7d3b960625393df537f900528ec4b14e6ddab8fd0c7e87c98cfe9d0')
   const signer = BIP32.fromSeed(seed).tweak(tweak)
 
   expect(tools.toHex(signer.sign(hash))).toBe(tools.toHex(signature))
@@ -305,12 +305,12 @@ it('tweak', () => {
 })
 
 it('tweak - neutered', () => {
-  const seed = Buffer.alloc(32, 1)
-  const hash = Buffer.alloc(32, 2)
-  const tweak = Buffer.alloc(32, 3)
-  const signature = Buffer.from('5a38c6652feb5166c9c91cfa5fa4a4c7cec27445d4619499df8afdd05ebc823246d644b0c7d3b960625393df537f900528ec4b14e6ddab8fd0c7e87c98cfe9d0', 'hex')
-  const schnorrsig = Buffer.from('f9d65ae90d7f6774a8c51e52147ceb664741755d1cab4a5c5f529a6a8b6a7d71e9a49ad008bef95b2185b60126f654e2382c5eaa71a76ddd08eb397c90658484', 'hex')
-  const signatureLowR = Buffer.from('5a38c6652feb5166c9c91cfa5fa4a4c7cec27445d4619499df8afdd05ebc823246d644b0c7d3b960625393df537f900528ec4b14e6ddab8fd0c7e87c98cfe9d0', 'hex')
+  const seed = new Uint8Array(32).fill(1)
+  const hash = new Uint8Array(32).fill(2)
+  const tweak = new Uint8Array(32).fill(3)
+  const signature = tools.fromHex('5a38c6652feb5166c9c91cfa5fa4a4c7cec27445d4619499df8afdd05ebc823246d644b0c7d3b960625393df537f900528ec4b14e6ddab8fd0c7e87c98cfe9d0')
+  const schnorrsig = tools.fromHex('f9d65ae90d7f6774a8c51e52147ceb664741755d1cab4a5c5f529a6a8b6a7d71e9a49ad008bef95b2185b60126f654e2382c5eaa71a76ddd08eb397c90658484')
+  const signatureLowR = tools.fromHex('5a38c6652feb5166c9c91cfa5fa4a4c7cec27445d4619499df8afdd05ebc823246d644b0c7d3b960625393df537f900528ec4b14e6ddab8fd0c7e87c98cfe9d0')
   const signer = BIP32.fromSeed(seed).neutered().tweak(tweak)
 
   expect(() => signer.sign(hash)).toThrow(/Missing private key/)
@@ -322,4 +322,153 @@ it('tweak - neutered', () => {
   expect(signer.verify(seed, signatureLowR)).toBe(false)
   expect(signer.verifySchnorr(hash, schnorrsig)).toBe(true)
   expect(signer.verifySchnorr(seed, schnorrsig)).toBe(false)
+})
+
+it('xOnlyPublicKey returns 32-byte x-only key', () => {
+  const seed = new Uint8Array(32).fill(1)
+  const node = BIP32.fromSeed(seed)
+  expect(node.xOnlyPublicKey.length).toBe(32)
+  // x-only key should be publicKey bytes 1..33
+  expect(tools.toHex(node.xOnlyPublicKey)).toBe(tools.toHex(node.publicKey.slice(1, 33)))
+})
+
+it('capabilities and hasCapability', () => {
+  const seed = new Uint8Array(32).fill(1)
+  const node = BIP32.fromSeed(seed)
+
+  // Private node has signing capabilities
+  expect(node.hasCapability(1)).toBe(true)   // Some capability bit
+  expect(node.capabilities).toBeGreaterThan(0)
+
+  // Neutered node loses sign capabilities
+  const neutered = node.neutered()
+  expect(neutered.capabilities).toBeGreaterThan(0) // Still has verify
+  expect(neutered.privateKey).toBe(undefined)
+})
+
+it('capabilities without schnorr', () => {
+  const bip32NoSchnorr = BIP32Creator({ ...ecc, signSchnorr: null, verifySchnorr: null })
+  const seed = new Uint8Array(32).fill(1)
+  const node = bip32NoSchnorr.fromSeed(seed)
+  // Should still have ECDSA capabilities
+  expect(node.capabilities).toBeGreaterThan(0)
+
+  const neutered = node.neutered()
+  expect(neutered.capabilities).toBeGreaterThan(0)
+})
+
+it('fromSeed throws on non-Uint8Array', () => {
+  expect(() => BIP32.fromSeed('not a buffer')).toThrow('Expected Uint8Array')
+  expect(() => BIP32.fromSeed(123)).toThrow('Expected Uint8Array')
+})
+
+it('fromPrecomputed creates key without validation', () => {
+  const seed = new Uint8Array(32).fill(1)
+  const master = BIP32.fromSeed(seed)
+  const child = master.derivePath("m/44'/0'/0'")
+
+  const restored = BIP32.fromPrecomputed(
+    child.privateKey,
+    child.publicKey,
+    child.chainCode,
+    child.depth,
+    child.index,
+    child.parentFingerprint
+  )
+
+  expect(tools.toHex(restored.publicKey)).toBe(tools.toHex(child.publicKey))
+  expect(tools.toHex(restored.privateKey)).toBe(tools.toHex(child.privateKey))
+  expect(restored.depth).toBe(child.depth)
+  expect(restored.index).toBe(child.index)
+  expect(restored.parentFingerprint).toBe(child.parentFingerprint)
+  expect(restored.toBase58()).toBe(child.toBase58())
+})
+
+it('fromPrecomputed with neutered key', () => {
+  const seed = new Uint8Array(32).fill(1)
+  const master = BIP32.fromSeed(seed)
+
+  const restored = BIP32.fromPrecomputed(
+    undefined,
+    master.publicKey,
+    master.chainCode,
+    0,
+    0,
+    0
+  )
+
+  expect(restored.isNeutered()).toBe(true)
+  expect(tools.toHex(restored.publicKey)).toBe(tools.toHex(master.publicKey))
+})
+
+it('derive skips when IL is not a valid private key', () => {
+  // Mock isPrivate so it passes testEcc and fromSeed, then rejects the first derive IL
+  let armed = false
+  let skipCount = 0
+  const mockEcc = {
+    ...ecc,
+    isPrivate: (d) => {
+      if (armed && skipCount === 0) {
+        skipCount++
+        return false // First call after arming fails, triggers skip to index+1
+      }
+      return ecc.isPrivate(d)
+    }
+  }
+  const bip32Mock = BIP32Creator(mockEcc)
+  const seed = new Uint8Array(32).fill(1)
+  const master = bip32Mock.fromSeed(seed)
+  armed = true // Arm AFTER fromSeed so seed validation passes
+  const child = master.derive(0)
+  expect(child).toBeDefined()
+  expect(skipCount).toBe(1) // Confirms the skip path was hit
+})
+
+it('derive skips when privateAdd returns null', () => {
+  // Mock privateAdd so it passes testEcc, then returns null on first derivation call
+  let armed = false
+  let skipCount = 0
+  const mockEcc = {
+    ...ecc,
+    privateAdd: (d, tweak) => {
+      if (armed && skipCount === 0) {
+        skipCount++
+        return null // First derivation triggers skip to index+1
+      }
+      return ecc.privateAdd(d, tweak)
+    }
+  }
+  const bip32Mock = BIP32Creator(mockEcc)
+  armed = true
+  const seed = new Uint8Array(32).fill(1)
+  const master = bip32Mock.fromSeed(seed)
+  const child = master.derive(0)
+  expect(child).toBeDefined()
+  expect(child.depth).toBe(1)
+  expect(skipCount).toBe(1)
+})
+
+it('derive skips when pointAddScalar returns null (public derivation)', () => {
+  // Mock pointAddScalar so it passes testEcc, then returns null on first derivation call
+  let armed = false
+  let skipCount = 0
+  const mockEcc = {
+    ...ecc,
+    pointAddScalar: (p, tweak, compressed) => {
+      if (armed && skipCount === 0) {
+        skipCount++
+        return null // First derivation triggers skip to index+1
+      }
+      return ecc.pointAddScalar(p, tweak, compressed)
+    }
+  }
+  const bip32Mock = BIP32Creator(mockEcc)
+  armed = true
+  const seed = new Uint8Array(32).fill(1)
+  const master = bip32Mock.fromSeed(seed)
+  const neutered = master.neutered()
+  const child = neutered.derive(0)
+  expect(child).toBeDefined()
+  expect(child.depth).toBe(1)
+  expect(skipCount).toBe(1)
 })

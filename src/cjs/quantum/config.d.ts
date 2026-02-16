@@ -1,5 +1,5 @@
 import { ml_dsa44, ml_dsa65, ml_dsa87 } from '@btc-vision/post-quantum/ml-dsa.js';
-import { Network } from '../types.js';
+import type { Network } from '@btc-vision/ecpair';
 /**
  * ML-DSA security levels
  *

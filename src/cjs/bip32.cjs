@@ -382,8 +382,8 @@ function BIP32Factory(ecc) {
         return fromPrivateKeyLocal(privateKey, chainCode, network);
     }
     function fromPrivateKeyLocal(privateKey, chainCode, network, depth, index, parentFingerprint) {
-        (0, types_js_1.validateBuffer256Bit)(privateKey);
-        (0, types_js_1.validateBuffer256Bit)(chainCode);
+        (0, types_js_1.validateBytes32)(privateKey);
+        (0, types_js_1.validateBytes32)(chainCode);
         network = network || networks_js_1.BITCOIN;
         if (!lib.isPrivate(privateKey))
             throw new TypeError('Private key not in range [1, n)');
@@ -393,8 +393,8 @@ function BIP32Factory(ecc) {
         return fromPublicKeyLocal(publicKey, chainCode, network);
     }
     function fromPublicKeyLocal(publicKey, chainCode, network, depth, index, parentFingerprint) {
-        (0, types_js_1.validateBuffer33Bytes)(publicKey);
-        (0, types_js_1.validateBuffer256Bit)(chainCode);
+        (0, types_js_1.validateBytes33)(publicKey);
+        (0, types_js_1.validateBytes32)(chainCode);
         network = network || networks_js_1.BITCOIN;
         // verify the X coordinate is a point on the curve
         if (!lib.isPoint(publicKey))

@@ -1,11 +1,11 @@
 import * as crypto from './crypto.js';
 import { testEcc } from './testecc.js';
 import * as bs58check from '@btc-vision/bs58check';
-import type { Network } from './types.js';
+import type { Network } from '@btc-vision/ecpair';
 import {
   validateBip32Path,
-  validateBuffer256Bit,
-  validateBuffer33Bytes,
+  validateBytes32,
+  validateBytes33,
 } from './types.js';
 import * as wif from '@btc-vision/wif';
 import * as tools from 'uint8array-tools';
@@ -526,8 +526,8 @@ export function BIP32Factory(
     index?: number,
     parentFingerprint?: number,
   ): BIP32Interface {
-    validateBuffer256Bit(privateKey);
-    validateBuffer256Bit(chainCode);
+    validateBytes32(privateKey);
+    validateBytes32(chainCode);
 
     network = network || BITCOIN;
 
@@ -560,8 +560,8 @@ export function BIP32Factory(
     index?: number,
     parentFingerprint?: number,
   ): BIP32Interface {
-    validateBuffer33Bytes(publicKey);
-    validateBuffer256Bit(chainCode);
+    validateBytes33(publicKey);
+    validateBytes32(chainCode);
 
     network = network || BITCOIN;
 

@@ -4,12 +4,12 @@ export function validateBip32Path(path) {
         throw new TypeError('Expected BIP32 derivation path');
     }
 }
-export function validateBuffer256Bit(buf) {
+export function validateBytes32(buf) {
     if (!(buf instanceof Uint8Array) || buf.length !== 32) {
         throw new TypeError('Expected Uint8Array of length 32');
     }
 }
-export function validateBuffer33Bytes(buf) {
+export function validateBytes33(buf) {
     if (!(buf instanceof Uint8Array) || buf.length !== 33) {
         throw new TypeError('Expected Uint8Array of length 33');
     }

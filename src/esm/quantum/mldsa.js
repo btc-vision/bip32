@@ -1,7 +1,7 @@
 import { randomBytes } from '@btc-vision/post-quantum/utils.js';
 import * as crypto from '../crypto.js';
 import * as tools from 'uint8array-tools';
-import { validateBip32Path, } from '../types.js';
+import { validateBip32Path } from '../types.js';
 import * as bs58check from '@btc-vision/bs58check';
 import { findNetworkByVersion, getMLDSAConfig, MLDSASecurityLevel, } from './config.js';
 import { BITCOIN as DEFAULT_NETWORK } from '../networks.js';
@@ -97,7 +97,7 @@ class QuantumBIP32 extends QuantumBip32Signer {
         const keySize = isPrivate
             ? this.config.privateKeySize
             : this.config.publicKeySize;
-        // Buffer structure:
+        // Byte layout:
         // 4 bytes: version
         // 1 byte: depth
         // 4 bytes: parent fingerprint
@@ -240,8 +240,8 @@ function fromBase58(inString) {
         throw new TypeError('Unknown network version');
     }
     const { network, isPrivate } = match;
-    // Determine security level from buffer size
-    // Buffer structure: 4 (version) + 1 (depth) + 4 (parent fp) + 4 (index) + 32 (chain code) + key data
+    // Determine security level from payload size
+    // Byte layout: 4 (version) + 1 (depth) + 4 (parent fp) + 4 (index) + 32 (chain code) + key data
     const headerSize = 4 + 1 + 4 + 4 + 32;
     const keyDataSize = buffer.length - headerSize;
     // Map key sizes to security levels
