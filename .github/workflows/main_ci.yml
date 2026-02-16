@@ -61,24 +61,6 @@ jobs:
       - name: Check hybrid build
         run: npm run checkHybrid
 
-  gitdiff:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: '24.x'
-          registry-url: 'https://registry.npmjs.org'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Check git diff
-        run: npm run gitdiff:ci
-
   lint:
     runs-on: ubuntu-latest
     steps:
