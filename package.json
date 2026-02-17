@@ -48,10 +48,10 @@
     "src"
   ],
   "dependencies": {
-    "@btc-vision/bs58check": "^5.0.0",
-    "@btc-vision/ecpair": "^4.0.4",
+    "@btc-vision/bs58check": "^5.0.1",
+    "@btc-vision/ecpair": "^4.0.5",
     "@btc-vision/post-quantum": "^0.5.3",
-    "@btc-vision/wif": "^6.0.0",
+    "@btc-vision/wif": "^6.0.1",
     "@noble/hashes": "^2.0.1",
     "uint8array-tools": "^0.0.9"
   },
