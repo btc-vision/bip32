@@ -1,5 +1,14 @@
 
 
+## [v7.1.2] - 2026-02-17
+
+### Features
+
+- Bump @btc-vision deps to patch versions ([#7](https://github.com/btc-vision/bip32/pull/7)) by @BlobMaster41
+
+
+
+
 ## [v7.1.1] - 2026-02-16
 
 - No changes
